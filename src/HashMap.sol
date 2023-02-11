@@ -9,6 +9,11 @@ struct HashMap {
     uint initialSize;
 }
 
+struct KV {
+    bytes32 key;
+    bytes32 value;
+}
+
 library HashMapLib {
     uint constant BUCKET_COUNT = 256;
 
@@ -111,11 +116,6 @@ library HashMapLib {
         }
 
         return keyList;
-    }
-
-    struct KV {
-        bytes32 key;
-        bytes32 value;
     }
 
     function entries (HashMap storage map) internal view returns (KV[] memory) {

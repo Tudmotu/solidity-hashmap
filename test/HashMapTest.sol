@@ -1,24 +1,49 @@
 pragma solidity ^0.8.18;
 
+import 'forge-std/Test.sol';
 import '../src/HashMap.sol';
 
-contract HashMapTest {
+contract HashMapTest is Test {
     using HashMapLib for HashMap;
 
     HashMap hashmap;
+    HashMap hashmap2;
 
     // The state of the contract gets reset before each
     // test is run, with the `setUp()` function being called
     // each time after deployment.
     function setUp() public {
         hashmap = HashMap(0);
+        hashmap2 = HashMap(0);
+    }
+
+    function testDifferentHashMaps_haveDifferentSizes () public {
+        hashmap.set("test", "blabla");
+        require(hashmap.size() == 1, "Size is not 1");
+        require(hashmap2.size() == 0, "Size is not 0");
+    }
+
+    function testKeys_returnsListOfAllKeys () public {
+        hashmap.set("test", "blabla");
+        hashmap.set("test3", "blabla3");
+        hashmap.set("test4", "blabla4");
+        bytes32[] memory keys = hashmap.keys();
+        require(keys[0] == "test", "Key number 0 is not 'test'");
+        require(keys[1] == "test3", "Key number 1 is not 'test3'");
+        require(keys[2] == "test4", "Key number 2 is not 'test4'");
     }
 
     function testEntries_returnsListOfAllEntries () public {
         hashmap.set("test", "blabla");
         hashmap.set("test3", "blabla3");
         hashmap.set("test4", "blabla4");
-        // TBD
+        KV[] memory entries = hashmap.entries();
+        require(entries[0].key == "test", "Entry 0 key is wrong");
+        require(entries[0].value == "blabla", "Entry 0 value is wrong");
+        require(entries[1].key == "test3", "Entry 1 key is wrong");
+        require(entries[1].value == "blabla3", "Entry 1 value is wrong");
+        require(entries[2].key == "test4", "Entry 2 key is wrong");
+        require(entries[2].value == "blabla4", "Entry 2 value is wrong");
     }
 
     function testRemoveKey_decreasesSize () public {
