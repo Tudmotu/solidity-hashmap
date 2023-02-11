@@ -17,6 +17,16 @@ contract HashMapTest is Test {
         hashmap2 = HashMap(0);
     }
 
+    function testValues_returnsListOfAllValues () public {
+        hashmap.set("test", "blabla");
+        hashmap.set("test3", "blabla3");
+        hashmap.set("test4", "blabla4");
+        bytes32[] memory values = hashmap.values();
+        require(values[0] == "blabla", "Value number 0 is not 'blabla'");
+        require(values[1] == "blabla3", "Value number 1 is not 'blabla3'");
+        require(values[2] == "blabla4", "Value number 2 is not 'blabla4'");
+    }
+
     function testDifferentHashMaps_haveDifferentSizes () public {
         hashmap.set("test", "blabla");
         require(hashmap.size() == 1, "Size is not 1");

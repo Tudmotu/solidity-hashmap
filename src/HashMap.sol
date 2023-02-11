@@ -83,6 +83,15 @@ library HashMapLib {
         } 
     }
 
+    function _getValueInBucketByIndex (HashMap storage map, uint bucket, uint index) private view returns (bytes32 value, uint valueSlot) {
+        uint firstValueSlot = baseSlot(map) + 1 + bucket + 2 * BUCKET_COUNT;
+        valueSlot = firstValueSlot + (2 * BUCKET_COUNT) * index;
+
+        assembly {
+            value := sload(valueSlot)
+        } 
+    }
+
     function _getKeyValueInBucketByIndex (HashMap storage map, uint bucket, uint index) private view returns (KV memory kv) {
         (bytes32 key, uint keySlot) = _getKeyInBucketByIndex(map, bucket, index);
 
@@ -95,6 +104,27 @@ library HashMapLib {
         }
 
         kv = KV(key, value);
+    }
+
+    function values (HashMap storage map) internal view returns (bytes32[] memory valueList) {
+        uint mapSize = size(map);
+        uint valueCount = 0;
+        valueList = new bytes32[](mapSize);
+
+        for (uint currBucket = 0; currBucket < BUCKET_COUNT; currBucket++) {
+            uint bucketSize = _bucketSize(map, currBucket);
+
+            for (uint bucketIndex = 0; bucketIndex < bucketSize; bucketIndex++) {
+                (bytes32 value,) = _getValueInBucketByIndex(map, currBucket, bucketIndex);
+                if (value == "") continue;
+                valueList[valueCount] = value;
+                valueCount++;
+            }
+
+            if (valueCount == mapSize) break;
+        }
+
+        return valueList;
     }
 
     function keys (HashMap storage map) internal view returns (bytes32[] memory keyList) {
