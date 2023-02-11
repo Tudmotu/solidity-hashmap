@@ -17,6 +17,15 @@ contract HashMapTest is Test {
         hashmap2 = HashMap(0);
     }
 
+    function testContains_returnsTrueIfExists () public {
+        hashmap.set("exists", "123");
+        require(hashmap.contains("exists") == true, "HashMap does not include initialized key");
+    }
+
+    function testIncludes_returnsFalseIfNotExists () public view {
+        require(hashmap.contains("non-existing") == false, "HashMap includes non-initialized key");
+    }
+
     function testValues_returnsListOfAllValues () public {
         hashmap.set("test", "blabla");
         hashmap.set("test3", "blabla3");

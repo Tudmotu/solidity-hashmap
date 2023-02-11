@@ -198,4 +198,9 @@ library HashMapLib {
         }
         _decreaseSize(map, bucketSlot);
     } 
+
+    function contains (HashMap storage map, bytes32 key) internal view returns (bool exists){
+        (, bytes32 currKey,) = _findKey(map, key);
+        exists = currKey != "";
+    }
 }
