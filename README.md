@@ -18,6 +18,22 @@ collisions". I am looking for people to review the code. If you understand what
 "storage slot collision" means and would like to review the code, please contact
 me directly or by opening an issue.
 
+## Installation
+Depending on what toolchain you are using, you will require different
+installation methods.
+
+### Foundry
+If you are using Foundry, install using Forge:
+```console
+$ forge install tudmotu/solidity-hashmap
+```
+
+### Hardhat
+If you are using Hardhat, install using NPM:
+```console
+$ npm i -D solidity-hashmap
+```
+
 ## Usage
 ```solidity
 import 'solidity-hashmap/HashMap.sol';
