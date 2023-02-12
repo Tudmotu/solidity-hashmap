@@ -5,7 +5,7 @@ complex data-structures such as HashMaps, LinkedLists, etc.
 This library is an attempt at implementing a true, efficient HashMap
 data-structure in Solidity which includes all the familiar API methods you'd
 expect a HashMap to support:
-
+- `.get()`/`.set()`
 - `.size()`
 - `.keys()`
 - `.values()`
@@ -49,6 +49,21 @@ contract Example {
     }
 }
 ```
+
+## Caveats
+Currently this implementation has some notable caveats. Some of these might get
+"fixed" and some will not, either due to technical or design limitations.
+- Keys and values are `bytes32`. To set/get different values, they must be cast
+appropriately
+- Some of the methods (e.g. `.entries()`, `.values()`) are very gas-intensive
+and are only appropriate in `view` functions called via RPC, where gas is not an
+issue
+- Keys cannot be an empty `bytes32`
+- Only value-types are currently supported: numbers, addresses and strings
+shorter than 32 bytes
+- `memory` HashMaps are currently not supported
+- A HashMap is almost O(1), but not quite. More keys means gas-efficiency might
+deteriorate but it will never reach O(n)
 
 ## Comparison to alternatives
 Two alternatives exist for HashMap:
