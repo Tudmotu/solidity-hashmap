@@ -1,0 +1,31 @@
+{
+  "name": "solidity-hashmap",
+  "version": "0.1.1",
+  "description": "A true HashMap implementation for Solidity",
+  "main": "src/HashMap.sol",
+  "scripts": {
+    "test": "forge test",
+    "prepare": "mv src/HashMap.sol .",
+    "postpack": "mv ./HashMap.sol ./src/HashMap.sol"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tudmotu/solidity-hashmap.git"
+  },
+  "keywords": [
+    "solidity",
+    "hashmap",
+    "mapping",
+    "enumerablemap",
+    "iterablemap"
+  ],
+  "author": "Yotam Bar-On",
+  "license": "Unlicense",
+  "bugs": {
+    "url": "https://github.com/Tudmotu/solidity-hashmap/issues"
+  },
+  "homepage": "https://github.com/Tudmotu/solidity-hashmap#readme",
+  "files": [
+    "HashMap.sol"
+  ]
+}
