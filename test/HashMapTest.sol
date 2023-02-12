@@ -52,6 +52,25 @@ contract HashMapTest is Test {
         require(keys[2] == "test4", "Key number 2 is not 'test4'");
     }
 
+    function testSetEmptyKey_revert () public {
+        vm.expectRevert("Key cannot be empty bytes32");
+        hashmap.set(bytes32(0), "test");
+    }
+
+    function testSet_noKeyCollisions_Fuzz (bytes32[] memory keys) public {
+        for (uint i = 0; i < keys.length; i++) {
+            vm.assume(keys[i] != bytes32(0));
+            bytes32 value = keccak256(abi.encode("value", keys[i]));
+            hashmap.set(keys[i], value);
+        }
+
+        for (uint i = 0; i < keys.length; i++) {
+            bytes32 val = hashmap.get(keys[i]);
+            bytes32 expected = keccak256(abi.encode("value", keys[i]));
+            require(val == expected, "Incorrect value");
+        }
+    }
+
     function testEntries_returnsListOfAllEntries () public {
         hashmap.set("test", "blabla");
         hashmap.set("test3", "blabla3");
@@ -84,10 +103,21 @@ contract HashMapTest is Test {
         require(hashmap.get("test4") == "test123", "Value is of 'test4' not test123");
     }
 
+    function testSetOverrideValues_returnsModifiedValue (bytes32 value, bytes32 modifiedValue) public {
+        hashmap.set("test", value);
+        hashmap.set("test", modifiedValue);
+        require(hashmap.get("test") == modifiedValue, "Value was not modified");
+    }
+
     function testSetOverrideValues_returnsModifiedValue () public {
         hashmap.set("test", "test123");
         hashmap.set("test", "123test");
         require(hashmap.get("test") == "123test", "Value is not 123test");
+    }
+
+    function testGet_returnsValue_Fuzz (bytes32 key, bytes32 value) public {
+        hashmap.set(key, value);
+        require(hashmap.get(key) == value, "Value is incorrect");
     }
 
     function testGet_returnsValue () public {

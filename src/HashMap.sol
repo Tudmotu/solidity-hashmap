@@ -170,6 +170,7 @@ library HashMapLib {
     } 
 
     function set (HashMap storage map, bytes32 key, bytes32 value) internal {
+        require(key != bytes32(0), "Key cannot be empty bytes32");
         (uint keySlot, bytes32 currKey, uint bucketSlot) = _findKey(map, key);
 
         assembly {
