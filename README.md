@@ -1,6 +1,10 @@
 # Solidity HashMap
-This is a true HashMap implementation for Solidity. Solidity famously lacks
-complex data-structures such as HashMaps, LinkedLists, etc.
+[![npm](https://img.shields.io/npm/v/solidity-hashmap)](https://www.npmjs.com/package/solidity-hashmap)
+Solidity famously lacks complex data-structures such as HashMaps, LinkedLists,
+etc. This is a true HashMap implementation for Solidity. 
+
+If you've ever wished you could use a simple key/value structure that lets you
+iterate over keys, find values, etc, this is for you.
 
 This library is an attempt at implementing a true, efficient HashMap
 data-structure in Solidity which includes all the familiar API methods you'd
@@ -17,6 +21,22 @@ This is WIP. It probably contains bugs that would cause "storage slot
 collisions". I am looking for people to review the code. If you understand what
 "storage slot collision" means and would like to review the code, please contact
 me directly or by opening an issue.
+
+## Why do we need a true HashMap?
+The `mapping()` data-structure in Solidity is very interesting. It manages to be
+very gas-efficient at O(1) while taking up 1 slot per key/value pair. This is
+highly efficient, but has a serious drawback: 
+Since the `mapping()` storage layout relies on hashing of keys, it is
+impossible to enumerate mappings. You cannot iterate over them or infer what
+keys they hold. Despite its name, it doesn't provide the same API as you'd
+expect of a `Map` object in other languages.
+
+This does not only affect smart-contract authors, but also off-chain data mining
+services. The `mapping()` type creates an untraceable storage trie that makes it
+much harder to index.
+
+HashMap makes development more natural while allowing off-chain tools to easily
+index your smart-contract data.
 
 ## Installation
 Depending on what toolchain you are using, you will require different
@@ -35,6 +55,8 @@ $ npm i -D solidity-hashmap
 ```
 
 ## Usage
+You must both import the library and extend the HashMap interface with the
+`using .. for` syntax.
 ```solidity
 import 'solidity-hashmap/HashMap.sol';
 
@@ -70,8 +92,8 @@ Two alternatives exist for HashMap:
 1. Solidity's builtin `mapping()` data structure
 1. OpenZeppelin `EnumerableMapping` implementation
 
-HashMap aims to find a balance between gas & storage efficiency, and Developer
-Experience. While Solidity's `mapping()` is very gas & storage efficient, it is
+HashMap aims to find a balance between gas/storage efficiency, and developer
+experience. While Solidity's `mapping()` is very gas & storage efficient, it is
 not developer friendly at all. And while `EnumerableMapping` is more developer
 friendly, it is not storage-efficient.
 
