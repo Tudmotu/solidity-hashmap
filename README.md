@@ -56,8 +56,8 @@ $ npm i -D solidity-hashmap
 ```
 
 ## Usage
-You must both import the library and extend the HashMap interface with the
-`using .. for` syntax.
+Usage is straightforward — import the library and use the `HashMap` type for your
+variables.
 ```solidity
 import 'solidity-hashmap/HashMap.sol';
 
