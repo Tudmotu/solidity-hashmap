@@ -3,11 +3,13 @@
 // This HashMap implementation is somewhat similar to how Java's HashMap works.
 // For example: https://anmolsehgal.medium.com/java-hashmap-internal-implementation-21597e1efec3
 
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity >=0.8.13 <0.9.0;
 
 struct HashMap {
     uint initialSize;
 }
+
+using HashMapLib for HashMap global;
 
 struct KV {
     bytes32 key;

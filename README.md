@@ -61,8 +61,6 @@ You must both import the library and extend the HashMap interface with the
 import 'solidity-hashmap/HashMap.sol';
 
 contract Example {
-    using HashMapLib for HashMap;
-
     HashMap hashmap;
 
     constructor () {

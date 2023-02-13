@@ -4,8 +4,6 @@ import 'forge-std/Test.sol';
 import '../src/HashMap.sol';
 
 contract HashMapTest is Test {
-    using HashMapLib for HashMap;
-
     HashMap hashmap;
     HashMap hashmap2;
 
