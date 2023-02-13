@@ -1,5 +1,6 @@
 # Solidity HashMap
 [![npm](https://img.shields.io/npm/v/solidity-hashmap)](https://www.npmjs.com/package/solidity-hashmap)
+
 Solidity famously lacks complex data-structures such as HashMaps, LinkedLists,
 etc. This is a true HashMap implementation for Solidity. 
 
