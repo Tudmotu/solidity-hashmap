@@ -1,6 +1,7 @@
 pragma solidity ^0.8.18;
 
 import 'forge-std/Test.sol';
+import 'openzeppelin-contracts/contracts/utils/Strings.sol';
 import '../src/HashMap.sol';
 
 contract HashMapTest is Test {
@@ -13,6 +14,73 @@ contract HashMapTest is Test {
     function setUp() public {
         hashmap = HashMap(0);
         hashmap2 = HashMap(0);
+    }
+
+    function testIterator_iterateAllKeys_Fuzz (bytes32[] memory keys) public {
+        vm.assume(keys.length > 0);
+        uint uniques;
+        for (uint i = 0; i < keys.length; i++) {
+            if (keys[i] == bytes32(0)) continue;
+            bool duplicate = false;
+            for (uint f = i + 1; f < keys.length; f++) {
+                if (keys[f] == keys[i]) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate == false) uniques++;
+        }
+        for (uint i = 0; i < keys.length; i++) {
+            if (keys[i] == bytes32(0)) continue;
+            hashmap.set(keys[i], keys[i]);
+        }
+
+        uint iteratedCount = 0;
+        HashMapIterator memory iterator = hashmap.iterator();
+
+        while (iterator.hasNext()) {
+            KV memory currEntry = iterator.next();
+            for (uint i = 0; i < keys.length; i++) {
+                if (keys[i] == currEntry.key) {
+                    require(currEntry.value == keys[i], "Value does not match");
+                    iteratedCount++;
+                    break;
+                }
+            }
+        }
+
+        require(uniques == iteratedCount, "Some keys are missing from iterator");
+    }
+
+    function testIteratorWithKeysInSameBucket_iterateAll () public {
+        bytes32 key1 = "test3";
+        bytes32 key2 = "test4";
+        hashmap.set(key1, "val");
+        hashmap.set(key2, "val");
+        HashMapIterator memory iterator = hashmap.iterator();
+        while (iterator.hasNext()) {
+            KV memory entry = iterator.next();
+            require(entry.key == key1 || entry.key == key2, "Entry does not match any keys");
+        }
+    }
+
+    function testIteratorWithTwoKeys_iterateAll () public {
+        bytes32 key1 = hex"00000000000000000000000000000000000000000000000000000000007f0002";
+        bytes32 key2 = hex"00000000000000000d000000000000000000000000000000000000004f000000";
+        hashmap.set(key1, "val");
+        hashmap.set(key2, "val");
+        HashMapIterator memory iterator = hashmap.iterator();
+        while (iterator.hasNext()) {
+            KV memory entry = iterator.next();
+            require(entry.key == key1 || entry.key == key2, "Entry does not match any keys");
+        }
+    }
+
+    function testIteratorNext_returnFirstKey () public {
+        hashmap.set("testKey", "123");
+        KV memory entry = hashmap.iterator().next();
+        require(entry.key == "testKey", "Iterator .next returned wrong key");
+        require(entry.value == "123", "Iterator .next returned wrong value");
     }
 
     function testContains_returnsTrueIfExists () public {
@@ -114,6 +182,7 @@ contract HashMapTest is Test {
     }
 
     function testGet_returnsValue_Fuzz (bytes32 key, bytes32 value) public {
+        vm.assume(key != bytes32(0));
         hashmap.set(key, value);
         require(hashmap.get(key) == value, "Value is incorrect");
     }

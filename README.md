@@ -10,12 +10,14 @@ iterate over keys, find values, etc, this is for you.
 This library is an attempt at implementing a true, efficient HashMap
 data-structure in Solidity which includes all the familiar API methods you'd
 expect a HashMap to support:
-- `.get()`/`.set()`
-- `.size()`
-- `.keys()`
-- `.values()`
-- `.entries()`
-- `.contains()`
+- `.get(bytes32 key): bytes32`
+- `.set(bytes32 key, bytes32 value): void`
+- `.size(): uint`
+- `.keys(): bytes32[]`
+- `.values(): bytes32[]`
+- `.entries(): KV[]`
+- `.contains(bytes32 key): bool`
+- `.iterator(): HashMapIterator`
 
 ## Disclaimer
 This is WIP. It probably contains bugs that would cause "storage slot
@@ -70,6 +72,34 @@ contract Example {
     }
 }
 ```
+
+### Iterator
+You can lazily iterate over a HashMap instead of pulling all entries at once.
+For that, you use a `HashMapIterator` instance, which can be create by invoking
+`.iterator()` on a HashMap.
+
+The `HashMapIterator` has the following API:
+- `.hasNext()`
+- `.next()`
+
+You can iterate over the HashMap as long as the `iterator.hasNext()` returns
+`true`:
+```solidity
+function findValueLargerThan10 (HashMap storage map) private returns (uint) {
+    HashMapIterator memory iterator = map.iterator();
+    while (iterator.hasNext()) {
+        KV entry = iterator.next();
+        uint val = uint(entry.value);
+        if (val > 10) return val;
+    }
+}
+```
+With an iterator, you don't need to enumerate the entire HashMap — which is very
+gas-consuming — in order to find a key or a value.
+
+## KV - Key/Value struct
+The `KV` struct is a wrapper around two `bytes32` variables. It has two fields:
+`.key` and `.value`.
 
 ## Caveats
 Currently this implementation has some notable caveats. Some of these might get

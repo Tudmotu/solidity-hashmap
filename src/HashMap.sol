@@ -5,6 +5,8 @@
 
 pragma solidity >=0.8.13 <0.9.0;
 
+uint constant BUCKET_COUNT = 256;
+
 struct HashMap {
     uint initialSize;
 }
@@ -17,7 +19,6 @@ struct KV {
 }
 
 library HashMapLib {
-    uint constant BUCKET_COUNT = 256;
 
     function bytesHash (bytes32 key) private pure returns (uint hash) {
         hash = uint(keccak256(abi.encode(key)));
@@ -69,7 +70,7 @@ library HashMapLib {
         }
     } 
 
-    function _bucketSize (HashMap storage map, uint bucket) private view returns (uint bucketSize) {
+    function _bucketSize (HashMap storage map, uint bucket) internal view returns (uint bucketSize) {
         assembly {
             let bucketSlot := add(add(map.slot, 1), bucket)
             bucketSize := sload(bucketSlot)
@@ -94,7 +95,7 @@ library HashMapLib {
         } 
     }
 
-    function _getKeyValueInBucketByIndex (HashMap storage map, uint bucket, uint index) private view returns (KV memory kv) {
+    function _getKeyValueInBucketByIndex (HashMap storage map, uint bucket, uint index) internal view returns (KV memory kv) {
         (bytes32 key, uint keySlot) = _getKeyInBucketByIndex(map, bucket, index);
 
         if (key == "") return KV("", "");
@@ -205,5 +206,43 @@ library HashMapLib {
     function contains (HashMap storage map, bytes32 key) internal view returns (bool exists){
         (, bytes32 currKey,) = _findKey(map, key);
         exists = currKey != "";
+    }
+
+    function iterator (HashMap storage map) internal pure returns (HashMapIterator memory iter) {
+        iter = HashMapIterator(baseSlot(map), 0);
+    }
+}
+
+struct HashMapIterator {
+    uint mapSlot;
+    uint current;
+}
+using HashMapIteratorLib for HashMapIterator global;
+
+library HashMapIteratorLib {
+    function _getMap (HashMapIterator memory iterator) private pure returns (HashMap storage map) {
+        uint mapSlot = iterator.mapSlot;
+        assembly {
+            map.slot := mapSlot
+        }
+    }
+
+    function next (HashMapIterator memory iterator) internal view returns (KV memory entry) {
+        HashMap storage map = _getMap(iterator);
+        uint position = iterator.current;
+        for (uint bucket = 0; bucket < BUCKET_COUNT; bucket++) {
+            uint bucketSize = map._bucketSize(bucket);
+            if (bucketSize == 0) continue;
+            if (bucketSize <= position) {
+                position -= bucketSize;
+                continue;
+            }
+            iterator.current++;
+            return map._getKeyValueInBucketByIndex(bucket, position);
+        }
+    }
+
+    function hasNext (HashMapIterator memory iterator) internal view returns (bool result) {
+        return _getMap(iterator).size() > iterator.current;
     }
 }
