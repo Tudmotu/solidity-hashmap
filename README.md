@@ -226,11 +226,11 @@ deteriorate but it will never reach O(n)
 ## Comparison to alternatives
 Two alternatives exist for HashMap:
 1. Solidity's builtin `mapping()` data structure
-1. OpenZeppelin `EnumerableMapping` implementation
+1. OpenZeppelin [`EnumerableMap` implementation](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/structs/EnumerableMap.sol)
 
 HashMap aims to find a balance between gas/storage efficiency, and developer
 experience. While Solidity's `mapping()` is very gas & storage efficient, it is
-not developer friendly at all. And while `EnumerableMapping` is more developer
+not developer friendly at all. And while `EnumerableMap` is more developer
 friendly, it is not storage-efficient.
 
 HashMap finds a balance between storage, gas, and developer experience. HashMap
