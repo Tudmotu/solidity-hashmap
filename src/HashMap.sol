@@ -209,40 +209,53 @@ library HashMapLib {
     }
 
     function iterator (HashMap storage map) internal pure returns (HashMapIterator memory iter) {
-        iter = HashMapIterator(baseSlot(map), 0);
+        Cursor memory cursor = Cursor(0, 0);
+        iter = HashMapIterator(baseSlot(map), 0, cursor);
     }
 }
 
+struct Cursor {
+    uint bucket;
+    uint position;
+}
 struct HashMapIterator {
     uint mapSlot;
     uint current;
+    Cursor cursor;
 }
 using HashMapIteratorLib for HashMapIterator global;
 
 library HashMapIteratorLib {
-    function _getMap (HashMapIterator memory iterator) private pure returns (HashMap storage map) {
-        uint mapSlot = iterator.mapSlot;
+    function _getMap (HashMapIterator memory self) private pure returns (HashMap storage map) {
+        uint mapSlot = self.mapSlot;
         assembly {
             map.slot := mapSlot
         }
     }
 
-    function next (HashMapIterator memory iterator) internal view returns (KV memory entry) {
-        HashMap storage map = _getMap(iterator);
-        uint position = iterator.current;
-        for (uint bucket = 0; bucket < BUCKET_COUNT; bucket++) {
-            uint bucketSize = map._bucketSize(bucket);
-            if (bucketSize == 0) continue;
-            if (bucketSize <= position) {
-                position -= bucketSize;
-                continue;
+    function next (HashMapIterator memory self) internal view returns (KV memory entry) {
+        HashMap storage map = _getMap(self);
+
+        while (self.cursor.bucket < BUCKET_COUNT) {
+            uint bucketSize = map._bucketSize(self.cursor.bucket);
+
+            if (bucketSize == 0) {
+                self.cursor.bucket += 1;
             }
-            iterator.current++;
-            return map._getKeyValueInBucketByIndex(bucket, position);
+            else if (bucketSize <= self.cursor.position) {
+                self.cursor.position -= bucketSize;
+            }
+            else {
+                self.current++;
+                return map._getKeyValueInBucketByIndex(
+                    self.cursor.bucket,
+                    self.cursor.position
+                );
+            }
         }
     }
 
-    function hasNext (HashMapIterator memory iterator) internal view returns (bool result) {
-        return _getMap(iterator).size() > iterator.current;
+    function hasNext (HashMapIterator memory self) internal view returns (bool result) {
+        return _getMap(self).size() > self.current;
     }
 }
