@@ -97,9 +97,116 @@ function findValueLargerThan10 (HashMap storage map) private returns (uint) {
 With an iterator, you don't need to enumerate the entire HashMap — which is very
 gas-consuming — in order to find a key or a value.
 
-## KV - Key/Value struct
+### KV - Key/Value struct
 The `KV` struct is a wrapper around two `bytes32` variables. It has two fields:
 `.key` and `.value`.
+
+## How does it work?
+This implementation is not a perfect HashMap implementation. This implementation
+is EVM-specific and some implementation details either require workarounds, or
+can't be implemented without incurring high gas fees. Below is a description of
+the storage architecture.
+
+### The hash table
+HashMap implementations are usually based on a "Hash Table". A Hash Table is a
+two-dimensional data structure, where each row has a "number" column and a
+LinkedList or array of values. The rows are numbered sequentially and the table
+has a specified "size" — meaning the amount of rows is limited.
+
+<img alt="Hash Table with 4 rows and different values" src="docs/hashtable.png" style="max-width:min(400px, 100%); display:block;" />
+
+The number of rows in the Hash Table is arbitrary. In non-blockchain VMs, it can
+even change in run-time. Currently, this implementation does not support
+changing the table size in run-time due to the associated gas costs.
+
+In this implementation, we refer to the number of each row as a *"bucket"*.
+
+### Saving values
+To save a key/value pair in the Hash Table, we do two things:
+1. We calculate the "bucket" of the key
+1. We append the key/value pair at the tip of the bucket's list
+
+To calculate the bucket of a key, we run it through `keccak256()`, then modulo
+with the size of the Hash Table.
+
+For example, if our Hash Table size is 256 and we want to save the key
+"badf00d", we get the bucket `156`:
+```solidity
+keccak256(hex"badf00d") % 256
+= 0x42c90d12a7423fdf083e3173b5158bb60b194185a3d0ca6ea9e0035e01be749c % 256
+= 156
+```
+
+We then append our key/value pair to that bucket:
+<img alt="Hash Table with rows numbered 1, 2, ..., 156" src="docs/badf00d.png" style="max-width:min(400px, 100%); display:block;" />
+
+### Finding values
+To find a value associated with a key, we need to traverse the Hash Table:
+1. Find the bucket of the key
+1. Iterate over the LinkedList until we find the key
+1. Fetch the associated value
+
+This means that `.get()` is not a perfect `O(1)`, but it will also never reach
+`O(n)`. This gives us a good balance between performance, memory consumption and
+developer experience.
+
+### Storage Layout
+Up till now, the above explanations were not specific to an EVM implementation.
+
+So how is this actually implemented in the EVM?
+
+HashMap utilizes a custom "storage layout". If you are unfamiliar with this
+concept, check out the [relevant Solidity docs](https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html).
+
+Every contract deployed on Ethereum gets its own "storage space". This
+storage space is composed of "slots" — individual blocks of 32 bytes. Slots are
+numbered sequentially and have a range of [0..2<sup>256</sup>-1]:
+<img alt="Square arranged horizontally, numbered 1,2,3,...2^256-1" src="docs/slotspace.png" style="max-width:min(400px, 100%); display:block;" />
+
+You can read and write from any slot using the `sstore` and `sload` EVM op
+codes:
+```solidity
+function increment () private returns (uint count) {
+    assembly {
+        count := sload(0)
+        sstore(add(count, 1))
+    }
+}
+```
+
+So what does the HashMap storage layout looks like?
+- The "base slot" contains the HashMap size (how many key/value pairs are
+  stored in total)
+- For every "bucket", we use 1 slot to store the size of the bucket (how many
+  pairs exist in this specific bucket)
+- From there on, key/value pairs are stored in slots that are separated by the
+  bucket count of our HashMap 
+
+To visualize this, let's say we have a Hash Map that uses 4 buckets:
+<img alt="A Hash Table with 4 rows and a single key/value pair in each row" src="docs/4buckets.png" style="max-width:min(400px, 100%); display:block;" />
+Here we see that we have 4 rows and in 3 of these rows we have stored values:
+- Row #0 contains:
+    - 0xbadf00d: "Hello World"
+    - 0xbadc0de: "Hello; --World"
+- Row #1 is empty
+- Row #2 contains:
+    - 0xc01df00d: "Cold World"
+- Row #3 contains:
+    - 0xf00: "Bar"
+
+The bucket for each value is not arbitrary. Remember, to determine the bucket of
+a key/value pair, we hash the key and modulo it by 4 (our Hash Table size).
+
+Next step in visualizing this, is to break the storage slot space into rows,
+each row the length of our Hash Table size (in this case, 4):
+<img alt="EVM storage space, arranged as a table with 4 slots in each row" src="docs/4slotsspace.png" style="max-width:min(400px, 100%); display:block;" />
+
+Now, imaging a *pivoted* Hash Table, where each column in the storage slot space
+is a "bucket", while the key/value pairs are stored on subsequent rows:
+<img alt="Depiction of our HashMap stored in the EVM storage slot space" src="docs/hashmapinstorage.png" style="max-width:min(400px, 100%); display:block;" />
+
+This is the gist of the storage layout of a HashMap. This does not depict
+everything precisely, but it should help visualize the storage layout.
 
 ## Caveats
 Currently this implementation has some notable caveats. Some of these might get
