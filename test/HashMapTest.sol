@@ -53,8 +53,8 @@ contract HashMapTest is Test {
     }
 
     function testIteratorWithKeysInSameBucket_iterateAll () public {
-        bytes32 key1 = "test3";
-        bytes32 key2 = "test4";
+        bytes32 key1 = "test156";
+        bytes32 key2 = "test196";
         hashmap.set(key1, "val");
         hashmap.set(key2, "val");
         HashMapIterator memory iterator = hashmap.iterator();
@@ -93,13 +93,13 @@ contract HashMapTest is Test {
     }
 
     function testValues_returnsListOfAllValues () public {
-        hashmap.set("test", "blabla");
+        hashmap.set("test1", "blabla1");
+        hashmap.set("test2", "blabla2");
         hashmap.set("test3", "blabla3");
-        hashmap.set("test4", "blabla4");
         bytes32[] memory values = hashmap.values();
-        require(values[0] == "blabla", "Value number 0 is not 'blabla'");
-        require(values[1] == "blabla3", "Value number 1 is not 'blabla3'");
-        require(values[2] == "blabla4", "Value number 2 is not 'blabla4'");
+        require(values[0] == "blabla2", "Value number 0 is incorrect");
+        require(values[1] == "blabla1", "Value number 1 is incorrect");
+        require(values[2] == "blabla3", "Value number 2 is incorrect");
     }
 
     function testDifferentHashMaps_haveDifferentSizes () public {
@@ -109,13 +109,13 @@ contract HashMapTest is Test {
     }
 
     function testKeys_returnsListOfAllKeys () public {
-        hashmap.set("test", "blabla");
-        hashmap.set("test3", "blabla3");
-        hashmap.set("test4", "blabla4");
+        hashmap.set("test1", "blabla");
+        hashmap.set("test2", "blabla3");
+        hashmap.set("test3", "blabla4");
         bytes32[] memory keys = hashmap.keys();
-        require(keys[0] == "test", "Key number 0 is not 'test'");
-        require(keys[1] == "test3", "Key number 1 is not 'test3'");
-        require(keys[2] == "test4", "Key number 2 is not 'test4'");
+        require(keys[0] == "test2", "Key number 0 is incorrect");
+        require(keys[1] == "test1", "Key number 1 is incorrect");
+        require(keys[2] == "test3", "Key number 2 is incorrect");
     }
 
     function testSetEmptyKey_revert () public {
@@ -138,16 +138,16 @@ contract HashMapTest is Test {
     }
 
     function testEntries_returnsListOfAllEntries () public {
-        hashmap.set("test", "blabla");
+        hashmap.set("test1", "blabla1");
+        hashmap.set("test2", "blabla2");
         hashmap.set("test3", "blabla3");
-        hashmap.set("test4", "blabla4");
         KV[] memory entries = hashmap.entries();
-        require(entries[0].key == "test", "Entry 0 key is wrong");
-        require(entries[0].value == "blabla", "Entry 0 value is wrong");
-        require(entries[1].key == "test3", "Entry 1 key is wrong");
-        require(entries[1].value == "blabla3", "Entry 1 value is wrong");
-        require(entries[2].key == "test4", "Entry 2 key is wrong");
-        require(entries[2].value == "blabla4", "Entry 2 value is wrong");
+        require(entries[0].key == "test2", "Entry 0 key is wrong");
+        require(entries[0].value == "blabla2", "Entry 0 value is wrong");
+        require(entries[1].key == "test1", "Entry 1 key is wrong");
+        require(entries[1].value == "blabla1", "Entry 1 value is wrong");
+        require(entries[2].key == "test3", "Entry 2 key is wrong");
+        require(entries[2].value == "blabla3", "Entry 2 value is wrong");
     }
 
     function testRemoveKey_decreasesSize () public {

@@ -5,7 +5,7 @@
 
 pragma solidity >=0.8.13 <0.9.0;
 
-uint constant BUCKET_COUNT = 256;
+uint constant BUCKET_COUNT = 65536;
 
 struct HashMap {
     uint initialSize;
