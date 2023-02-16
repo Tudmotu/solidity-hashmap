@@ -1,3 +1,8 @@
+<style>
+img {
+    max-width:min(400px, 100%)!important;
+}
+</style>
 # Solidity HashMap
 [![npm](https://img.shields.io/npm/v/solidity-hashmap)](https://www.npmjs.com/package/solidity-hashmap)
 
@@ -21,9 +26,10 @@ expect a HashMap to support:
 
 ## Disclaimer
 This is WIP. It probably contains bugs that would cause "storage slot
-collisions". I am looking for people to review the code. If you understand what
-"storage slot collision" means and would like to review the code, please contact
-me directly or by opening an issue.
+collisions". It is still far from being gas-optimized. I am looking for people
+to review the code. If you understand what "storage slot collision" means and
+would like to review the code, please contact me directly or by opening an
+issue.
 
 ## Why do we need a true HashMap?
 The `mapping()` data-structure in Solidity is very interesting. It manages to be
@@ -169,7 +175,7 @@ codes:
 function increment () private returns (uint count) {
     assembly {
         count := sload(0)
-        sstore(add(count, 1))
+        sstore(0, add(count, 1))
     }
 }
 ```
@@ -235,6 +241,25 @@ friendly, it is not storage-efficient.
 
 HashMap finds a balance between storage, gas, and developer experience. HashMap
 is both efficient in gas & storage, while providing a simple, familiar API.
+
+### Gas costs comparison
+| Test                           | HashMap       | EnumerableMap | Mapping       |
+| ------------------------------ | ------------- | ------------- | ------------- |
+| Write 100k keys to map         | 6,009,637,459 | 6,813,750,249 | 2,322,328,349 |
+| Write 10k keys to map          | 662,403,950   | 674,363,731   | 225,201,831   |
+| Find a key in a 10k map        | 3,250,305     | 845,312       | 845,037       |
+| Iterate over 10k keys          | 37,184,407    | 10,379,049    | 5,948,854     |
+| Remove 10k keys                | 23,487,325    | 19,274,889    | 6,034,889     |
+| Find a key in a single key map | 3,954         | 3,490         | 3,203         |
+| Write a single key             | 89,304        | 89,170        | 22,287        |
+
+What you can see with these results, is that HashMap is somewhat more expensive
+to use than `EnumerableMap` with small map sizes, but the larger the map, the
+better HashMap performs. At 100k keys, HashMap can save users **800M gas**
+compared to `EnumerableMap`.
+
+In addition, HashMap is still WIP. There are some optimizations (such as using a
+Balanced Tree instead of LinkedLists) that could reduce gas costs even further.
 
 # Contributions
 Contributions are welcome.

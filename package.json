@@ -27,5 +27,8 @@
   "homepage": "https://github.com/Tudmotu/solidity-hashmap#readme",
   "files": [
     "HashMap.sol"
-  ]
+  ],
+  "devDependencies": {
+    "markdown-table": "^3.0.3"
+  }
 }

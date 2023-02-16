@@ -1,3 +1,5 @@
 cache
 out
 *.tgz
+.gas-snapshot
+node_modules
