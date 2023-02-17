@@ -24,15 +24,20 @@ library HashMapLib {
         hash = uint(keccak256(abi.encode(key)));
     }
 
-    function baseSlot (HashMap storage map) private pure returns (uint slot) {
+    function soliditySlot (HashMap storage map) private pure returns (uint slot) {
         assembly {
             slot := map.slot
         }
     }
 
+    function baseSlot (HashMap storage map) private pure returns (uint slot) {
+        slot = uint(keccak256(abi.encodePacked(soliditySlot(map))));
+    }
+
     function size (HashMap storage map) internal view returns (uint mapSize) {
+        uint slot = baseSlot(map);
         assembly {
-            mapSize := sload(map.slot)
+            mapSize := sload(slot)
         }
     }
 
@@ -57,22 +62,25 @@ library HashMapLib {
     }
 
     function _increaseSize (HashMap storage map, uint bucketSlot) private {
+        uint slot = baseSlot(map);
         assembly {
-            sstore(map.slot, add(sload(map.slot), 1))
+            sstore(slot, add(sload(slot), 1))
             sstore(bucketSlot, add(sload(bucketSlot), 1))
         }
     } 
 
     function _decreaseSize (HashMap storage map, uint bucketSlot) private {
+        uint slot = baseSlot(map);
         assembly {
-            sstore(map.slot, sub(sload(map.slot), 1))
+            sstore(slot, sub(sload(slot), 1))
             sstore(bucketSlot, sub(sload(bucketSlot), 1))
         }
     } 
 
     function _bucketSize (HashMap storage map, uint bucket) internal view returns (uint bucketSize) {
+        uint slot = baseSlot(map);
         assembly {
-            let bucketSlot := add(add(map.slot, 1), bucket)
+            let bucketSlot := add(add(slot, 1), bucket)
             bucketSize := sload(bucketSlot)
         }
     }
@@ -210,7 +218,7 @@ library HashMapLib {
 
     function iterator (HashMap storage map) internal pure returns (HashMapIterator memory iter) {
         Cursor memory cursor = Cursor(0, 0);
-        iter = HashMapIterator(baseSlot(map), 0, cursor);
+        iter = HashMapIterator(soliditySlot(map), 0, cursor);
     }
 }
 

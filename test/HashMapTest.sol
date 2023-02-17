@@ -102,7 +102,18 @@ contract HashMapTest is Test {
         require(values[2] == "blabla3", "Value number 2 is incorrect");
     }
 
-    function testDifferentHashMaps_haveDifferentSizes () public {
+    function testMultipleHashMaps_dontCollide () public {
+        uint SIZE = 50000;
+        for (uint i = 0; i < SIZE; i++) {
+            hashmap.set(keccak256(abi.encodePacked(i)), bytes32(i));
+            hashmap2.set(keccak256(abi.encodePacked(i)), bytes32(i));
+        }
+
+        require(hashmap.size() == SIZE, "Hashmap 1 has incorrect size");
+        require(hashmap2.size() == SIZE, "Hashmap 2 has incorrect size");
+    }
+
+    function testMultipleHashMaps_haveDifferentSizes () public {
         hashmap.set("test", "blabla");
         require(hashmap.size() == 1, "Size is not 1");
         require(hashmap2.size() == 0, "Size is not 0");
