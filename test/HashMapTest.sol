@@ -161,6 +161,35 @@ contract HashMapTest is Test {
         require(entries[2].value == "blabla3", "Entry 2 value is wrong");
     }
 
+    function testRemoveKeyEmptyMap_revert () public {
+        vm.expectRevert("Key does not exist");
+        hashmap.remove("non-existing");
+    }
+
+    function testRemoveKey_packsValuesInStorage () public {
+        // These all go in the same bucket: 16373
+        hashmap.set("test8590", "blabla");
+        hashmap.set("test16619", "blabla");
+        hashmap.set("test16798", "blabla");
+        hashmap.set("test17756", "blabla");
+        hashmap.set("test20898", "blabla");
+
+        hashmap.remove("test16619");
+
+        bytes32[] memory keys = hashmap.keys();
+        bytes32[4] memory expectedKeys = [
+            bytes32("test8590"),
+            bytes32("test20898"),
+            bytes32("test16798"),
+            bytes32("test17756")
+        ];
+
+        assertEq(keys[0], expectedKeys[0], 'Key 1 is wrong');
+        assertEq(keys[1], expectedKeys[1], 'Key 2 is wrong');
+        assertEq(keys[2], expectedKeys[2], 'Key 3 is wrong');
+        assertEq(keys[3], expectedKeys[3], 'Key 4 is wrong');
+    }
+
     function testRemoveKey_decreasesSize () public {
         hashmap.set("test3", "blabla");
         hashmap.remove("test3");

@@ -19,7 +19,6 @@ struct KV {
 }
 
 library HashMapLib {
-
     function bytesHash (bytes32 key) private pure returns (uint hash) {
         hash = uint(keccak256(abi.encode(key)));
     }
@@ -145,12 +144,16 @@ library HashMapLib {
 
         for (uint currBucket = 0; currBucket < BUCKET_COUNT; currBucket++) {
             uint bucketSize = _bucketSize(map, currBucket);
+            uint bucketIndex = 0;
+            uint bucketKeyCount = 0;
 
-            for (uint bucketIndex = 0; bucketIndex < bucketSize; bucketIndex++) {
+            while (bucketKeyCount < bucketSize) {
                 (bytes32 key,) = _getKeyInBucketByIndex(map, currBucket, bucketIndex);
+                bucketIndex++;
                 if (key == "") continue;
                 keyList[keyCount] = key;
                 keyCount++;
+                bucketKeyCount++;
             }
 
             if (keyCount == mapSize) break;
@@ -202,11 +205,22 @@ library HashMapLib {
     }
 
     function remove (HashMap storage map, bytes32 key) internal {
-        (uint keySlot, , uint bucketSlot) = _findKey(map, key);
+        (uint keySlot, bytes32 currKey, uint bucketSlot) = _findKey(map, key);
+        require(currKey != bytes32(0), "Key does not exist");
+
+        uint bucketSize;
+        assembly {
+            bucketSize := sload(bucketSlot)
+        }
+        uint lastKeySlot = bucketSlot + BUCKET_COUNT + (bucketSize - 1) * 2 * BUCKET_COUNT;
+        uint lastValueSlot = lastKeySlot + BUCKET_COUNT;
+
         assembly {
             let valueSlot := add(keySlot, BUCKET_COUNT)
-            sstore(keySlot, "")
-            sstore(valueSlot, "")
+            sstore(keySlot, sload(lastKeySlot))
+            sstore(valueSlot, sload(lastValueSlot))
+            sstore(lastKeySlot, "")
+            sstore(lastValueSlot, "")
         }
         _decreaseSize(map, bucketSlot);
     } 
