@@ -16,7 +16,9 @@ contract HashMapTest is Test {
         hashmap2 = HashMap(0);
     }
 
-    function testIterator_iterateAllKeys_Fuzz (bytes32[] memory keys) public {
+    function testIterator_iterateAllKeys_Fuzz (bytes32[100] memory keys) public {
+        vm.pauseGasMetering();
+
         vm.assume(keys.length > 0);
         uint uniques;
         for (uint i = 0; i < keys.length; i++) {
@@ -36,6 +38,9 @@ contract HashMapTest is Test {
         }
 
         uint iteratedCount = 0;
+
+        vm.resumeGasMetering();
+
         HashMapIterator memory iterator = hashmap.iterator();
 
         while (iterator.hasNext()) {
@@ -52,32 +57,61 @@ contract HashMapTest is Test {
         require(uniques == iteratedCount, "Some keys are missing from iterator");
     }
 
-    function testIteratorWithKeysInSameBucket_iterateAll () public {
-        bytes32 key1 = "test156";
-        bytes32 key2 = "test196";
+    function testIteratorWithSomeKeysInSameBucket_iterateAll (bytes32 key0) public {
+        vm.assume(key0 != bytes32(0));
+        vm.pauseGasMetering();
+        hashmap.set(key0, "val");
+        // These all go in the same bucket: 16373
+        bytes32 key1 = "test8590";
+        bytes32 key2 = "test16619";
         hashmap.set(key1, "val");
         hashmap.set(key2, "val");
-        HashMapIterator memory iterator = hashmap.iterator();
-        while (iterator.hasNext()) {
-            KV memory entry = iterator.next();
-            require(entry.key == key1 || entry.key == key2, "Entry does not match any keys");
+        vm.resumeGasMetering();
+
+        uint key0Bucket = HashMapLib._bucketNumber(key0);
+
+        bytes32[3] memory expectedKeys;
+
+        if (key0Bucket <= 16373) {
+            expectedKeys[0] = key0;
+            expectedKeys[1] = key1;
+            expectedKeys[2] = key2;
         }
+        else {
+            expectedKeys[0] = key1;
+            expectedKeys[1] = key2;
+            expectedKeys[2] = key0;
+        }
+
+        HashMapIterator memory iterator = hashmap.iterator();
+        assertEq(iterator.next().key, expectedKeys[0], "Key 0 is incorrect");
+        assertEq(iterator.next().key, expectedKeys[1], "Key 1 is incorrect");
+        assertEq(iterator.next().key, expectedKeys[2], "Key 2 is incorrect");
     }
 
-    function testIteratorWithTwoKeys_iterateAll () public {
-        bytes32 key1 = hex"00000000000000000000000000000000000000000000000000000000007f0002";
-        bytes32 key2 = hex"00000000000000000d000000000000000000000000000000000000004f000000";
-        hashmap.set(key1, "val");
-        hashmap.set(key2, "val");
+    function testIteratorWithTwoKeys_iterateAll (bytes32[2] memory keys) public {
+        vm.assume(keys[0] != bytes32(0));
+        vm.assume(keys[1] != bytes32(0));
+        vm.pauseGasMetering();
+        hashmap.set(keys[0], "val");
+        hashmap.set(keys[1], "val");
+        vm.resumeGasMetering();
+
         HashMapIterator memory iterator = hashmap.iterator();
+        uint count;
         while (iterator.hasNext()) {
             KV memory entry = iterator.next();
-            require(entry.key == key1 || entry.key == key2, "Entry does not match any keys");
+            require(entry.key == keys[0] || entry.key == keys[1], "Entry does not match any keys");
+            count++;
         }
+
+        require(count == 2, "Not all keys found");
     }
 
     function testIteratorNext_returnFirstKey () public {
+        vm.pauseGasMetering();
         hashmap.set("testKey", "123");
+        vm.resumeGasMetering();
         KV memory entry = hashmap.iterator().next();
         require(entry.key == "testKey", "Iterator .next returned wrong key");
         require(entry.value == "123", "Iterator .next returned wrong value");
@@ -93,9 +127,11 @@ contract HashMapTest is Test {
     }
 
     function testValues_returnsListOfAllValues () public {
+        vm.pauseGasMetering();
         hashmap.set("test1", "blabla1");
         hashmap.set("test2", "blabla2");
         hashmap.set("test3", "blabla3");
+        vm.resumeGasMetering();
         bytes32[] memory values = hashmap.values();
         require(values[0] == "blabla2", "Value number 0 is incorrect");
         require(values[1] == "blabla1", "Value number 1 is incorrect");
