@@ -17,6 +17,16 @@ const DESCRIPTIONS = {
     test_writeSingleKey: "Write a single key"
 };
 
+const ORDER = [
+    "test_writeSingleKey",
+    "test_write10kKeys",
+    "test_write100kKeys",
+    "test_findKeyIn10kMap",
+    "test_findKeySingleKeyMap",
+    "test_iterate10kKeys",
+    "test_remove10kKeys"
+];
+
 const results = {};
 
 exec('forge snapshot --match-path "./test/gas-comparison/*"', async (err, stdout, stderr) => {
@@ -40,7 +50,8 @@ exec('forge snapshot --match-path "./test/gas-comparison/*"', async (err, stdout
         ['Test', 'HashMap', 'EnumerableMap', 'Mapping']
     ];
 
-    for (let [test, result] of Object.entries(results)) {
+    for (let test of ORDER) {
+        const result = results[test];
         table.push([DESCRIPTIONS[test], result.HashMap, result.EnumerableMap, result.Mapping]);
     }
 
