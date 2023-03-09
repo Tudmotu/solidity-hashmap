@@ -89,7 +89,8 @@ contract HashMapTest is Test {
         assertEq(iterator.next().key, expectedKeys[2], "Key 2 is incorrect");
     }
 
-    function testIteratorWithTwoKeys_iterateAll (bytes32[2] memory keys) public {
+    function testIteratorWithTwoKeys_iterateAll_Fuzz (bytes32[2] memory keys) public {
+        vm.assume(keys[0] != keys[1]);
         vm.assume(keys[0] != bytes32(0));
         vm.assume(keys[1] != bytes32(0));
         vm.pauseGasMetering();
@@ -139,14 +140,17 @@ contract HashMapTest is Test {
     }
 
     function testMultipleHashMaps_dontCollide () public {
-        uint SIZE = 50000;
-        for (uint i = 0; i < SIZE; i++) {
-            hashmap.set(keccak256(abi.encodePacked(i)), bytes32(i));
-            hashmap2.set(keccak256(abi.encodePacked(i)), bytes32(i));
+        vm.pauseGasMetering();
+        uint SIZE = 32000;
+        for (uint i = 1; i < SIZE + 1; i++) {
+            bytes32 data = bytes32(i);
+            hashmap.set(data, data);
+            hashmap2.set(data, data);
         }
+        vm.resumeGasMetering();
 
-        require(hashmap.size() == SIZE, "Hashmap 1 has incorrect size");
-        require(hashmap2.size() == SIZE, "Hashmap 2 has incorrect size");
+        assertEq(hashmap.size(), SIZE, "Hashmap 1 has incorrect size");
+        assertEq(hashmap2.size(), SIZE, "Hashmap 2 has incorrect size");
     }
 
     function testMultipleHashMaps_haveDifferentSizes () public {

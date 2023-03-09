@@ -30,13 +30,14 @@ library HashMapLib {
     }
 
     function baseSlot (HashMap storage map) private pure returns (uint slot) {
-        slot = uint(keccak256(abi.encodePacked(soliditySlot(map))));
+        slot = bytesHash(bytes32(soliditySlot(map)));
     }
 
     function size (HashMap storage map) internal view returns (uint mapSize) {
-        uint slot = baseSlot(map);
-        assembly {
-            mapSize := sload(slot)
+        HashMapIterator memory iter = iterator(map);
+        while (iter.hasNext()) {
+            iter.next();
+            mapSize++;
         }
     }
 
@@ -63,22 +64,6 @@ library HashMapLib {
             }
         }
     }
-
-    function _increaseSize (HashMap storage map, uint bucketSlot) private {
-        uint slot = baseSlot(map);
-        assembly {
-            sstore(slot, add(sload(slot), 1))
-            sstore(bucketSlot, add(sload(bucketSlot), 1))
-        }
-    } 
-
-    function _decreaseSize (HashMap storage map, uint bucketSlot) private {
-        uint slot = baseSlot(map);
-        assembly {
-            sstore(slot, sub(sload(slot), 1))
-            sstore(bucketSlot, sub(sload(bucketSlot), 1))
-        }
-    } 
 
     function _bucketSize (HashMap storage map, uint bucket) internal view returns (uint bucketSize) {
         uint slot = baseSlot(map);
@@ -199,15 +184,11 @@ library HashMapLib {
 
     function set (HashMap storage map, bytes32 key, bytes32 value) internal {
         require(key != bytes32(0), "Key cannot be empty bytes32");
-        (uint keySlot, bytes32 currKey, uint bucketSlot) = _findKey(map, key);
+        (uint keySlot,,) = _findKey(map, key);
 
         assembly {
             sstore(keySlot, key)
             sstore(add(keySlot, BUCKET_COUNT), value)
-        }
-
-        if (currKey != key) {
-            _increaseSize(map, bucketSlot);
         }
     }
 
@@ -241,7 +222,6 @@ library HashMapLib {
             sstore(lastKeySlot, "")
             sstore(lastValueSlot, "")
         }
-        _decreaseSize(map, bucketSlot);
     } 
 
     function contains (HashMap storage map, bytes32 key) internal view returns (bool exists){
@@ -249,9 +229,9 @@ library HashMapLib {
         exists = currKey != "";
     }
 
-    function iterator (HashMap storage map) internal view returns (HashMapIterator memory iter) {
+    function iterator (HashMap storage map) internal pure returns (HashMapIterator memory iter) {
         Cursor memory cursor = Cursor(0, 0);
-        iter = HashMapIterator(soliditySlot(map), size(map), 0, cursor);
+        iter = HashMapIterator(soliditySlot(map), cursor, false);
     }
 }
 
@@ -259,12 +239,13 @@ struct Cursor {
     uint bucket;
     uint position;
 }
+
 struct HashMapIterator {
     uint mapSlot;
-    uint mapSize;
-    uint current;
     Cursor cursor;
+    bool done;
 }
+
 using HashMapIteratorLib for HashMapIterator global;
 
 library HashMapIteratorLib {
@@ -275,35 +256,44 @@ library HashMapIteratorLib {
         }
     }
 
-    function next (HashMapIterator memory self) internal view returns (KV memory entry) {
+    function scan (HashMapIterator memory self) internal view returns (bytes32 nextKey, uint keySlot) {
         HashMap storage map = _getMap(self);
 
         while (self.cursor.bucket < BUCKET_COUNT) {
-            (bytes32 nextKeyInBucket, uint keySlot) = map._getKeyInBucketByIndex(
+            (nextKey, keySlot) = map._getKeyInBucketByIndex(
                 self.cursor.bucket,
                 self.cursor.position
             );
 
-            if (nextKeyInBucket != bytes32(0)) {
-                bytes32 nextValueInBucket;
-
-                assembly {
-                    nextValueInBucket := sload(add(keySlot, BUCKET_COUNT))
-                }
-
-                self.current++;
-                self.cursor.position++;
-
-                return KV(nextKeyInBucket, nextValueInBucket);
+            if (nextKey != bytes32(0)) {
+                return (nextKey, keySlot);
             }
             else {
                 self.cursor.bucket++;
                 self.cursor.position = 0;
             }
         }
+
+        self.done = true;
     }
 
-    function hasNext (HashMapIterator memory self) internal pure returns (bool result) {
-        return self.mapSize > self.current;
+    function next (HashMapIterator memory self) internal view returns (KV memory entry) {
+        (bytes32 nextKey, uint keySlot) = scan(self);
+
+        if (nextKey != bytes32(0)) {
+            bytes32 nextValue;
+
+            assembly {
+                nextValue := sload(add(keySlot, BUCKET_COUNT))
+            }
+
+            self.cursor.position++;
+            return KV(nextKey, nextValue);
+        }
+    }
+
+    function hasNext (HashMapIterator memory self) internal view returns (bool result) {
+        scan(self);
+        return self.done == false;
     }
 }
