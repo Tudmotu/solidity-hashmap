@@ -3,10 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 
-const CONTRACT_NAME = /^(.*)GasTest\:/;
-const TEST_NAME = /\:(.*?)\(/;
-const GAS_AMOUNT = /gas\: (\d+)/;
-
 const DESCRIPTIONS = {
     test_findKeyIn10kMap: "Find a key in a 10k map",
     test_findKeySingleKeyMap: "Find a key in a single key map",
@@ -29,21 +25,23 @@ const ORDER = [
 
 const results = {};
 
-exec('forge snapshot --match-path "./test/gas-comparison/*"', async (err, stdout, stderr) => {
+exec('forge test -j --match-path "./test/gas-comparison/*"', async (err, stdout, stderr) => {
     if (err) {
         console.error('Forge command failed');
         return;
     }
 
-    const file = fs.readFileSync(path.join(__dirname, '.gas-snapshot'), 'utf8');
-    const lines = file.split('\n');
+    const json = stdout.split('\n').find(l => l.startsWith('{'));
+    const info = JSON.parse(json);
 
-    for (let line of lines) {
-        const contract = line.match(CONTRACT_NAME)[1];
-        const test = line.match(TEST_NAME)[1];
-        const gas = line.match(GAS_AMOUNT)[1];
-        results[test] = results[test] ?? { HashMap: null, EnumerableMap: null, Mapping: null };
-        results[test][contract] = BigInt(gas).toLocaleString();
+    for (let [testFile, details] of Object.entries(info)) {
+        const contract = testFile.split(':')[1].replace('GasTest', '');
+        for (let [test, testResults] of Object.entries(details.test_results)) {
+            test = test.replace('()', '');
+            const gas = testResults.decoded_logs.find(l => l.startsWith('Gas used')).match(/(\d+)/)[1];
+            results[test] = results[test] ?? { HashMap: null, EnumerableMap: null, Mapping: null };
+            results[test][contract] = BigInt(gas).toLocaleString();
+        }
     }
 
     const table = [

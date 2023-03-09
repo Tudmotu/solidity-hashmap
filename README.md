@@ -7,10 +7,7 @@ img {
 [![npm](https://img.shields.io/npm/v/solidity-hashmap)](https://www.npmjs.com/package/solidity-hashmap)
 
 Solidity famously lacks complex data-structures such as HashMaps, LinkedLists,
-etc. This is a true HashMap implementation for Solidity. 
-
-If you've ever wished you could use a simple key/value structure that lets you
-iterate over keys, find values, etc, this is for you.
+etc. `solidity-hashmap` is a true HashMap implementation for Solidity. 
 
 This library is an attempt at implementing a true, efficient HashMap
 data-structure in Solidity which includes all the familiar API methods you'd
@@ -26,10 +23,20 @@ expect a HashMap to support:
 
 ## Disclaimer
 This is WIP. It probably contains bugs that would cause "storage slot
-collisions". It is still far from being gas-optimized. I am looking for people
+collisions". It is still not fully gas-optimized. I am looking for people
 to review the code. If you understand what "storage slot collision" means and
 would like to review the code, please contact me directly or by opening an
 issue.
+
+## When should I use a HashMap?
+This `HashMap` implementation is storage-optimized. This means it is much
+cheaper to write key/value pairs than with `EnumerableMap`. But this comes with
+a trade-off — it is orders of magnitude more expensive to iterate.
+
+Therefore, prefer a `HashMap` over `EnumerableMap` if you:
+1. Will mostly be writing keys, not reading
+1. Will be mostly appending values, with few deletions
+1. Don't need to iterate over it inside non-view functions
 
 ## Why do we need a true HashMap?
 The `mapping()` data-structure in Solidity is very interesting. It manages to be
@@ -101,13 +108,14 @@ function findValueLargerThan10 (HashMap storage map) private returns (uint) {
 }
 ```
 With an iterator, you don't need to enumerate the entire HashMap — which is very
-gas-consuming — in order to find a key or a value.
+gas-consuming — in order to find a key or a value. It's still very gas intensive
+and meant for view functions only.
 
 ### KV - Key/Value struct
 The `KV` struct is a wrapper around two `bytes32` variables. It has two fields:
 `.key` and `.value`.
 
-## How does it work?
+## How does `HashMap` work?
 This implementation is not a perfect HashMap implementation. This implementation
 is EVM-specific and some implementation details either require workarounds, or
 can't be implemented without incurring high gas fees. Below is a description of
@@ -245,18 +253,16 @@ is both efficient in gas & storage, while providing a simple, familiar API.
 ### Gas costs comparison
 | Test                           | HashMap       | EnumerableMap | Mapping       |
 | ------------------------------ | ------------- | ------------- | ------------- |
-| Write 100k keys to map         | 6,009,637,459 | 6,813,750,249 | 2,322,328,349 |
-| Write 10k keys to map          | 662,403,950   | 674,363,731   | 225,201,831   |
-| Find a key in a 10k map        | 3,250,305     | 845,312       | 845,037       |
-| Iterate over 10k keys          | 37,184,407    | 10,379,049    | 5,948,854     |
-| Remove 10k keys                | 23,487,325    | 19,274,889    | 6,034,889     |
-| Find a key in a single key map | 3,954         | 3,490         | 3,203         |
-| Write a single key             | 89,304        | 89,170        | 22,287        |
-
-What you can see with these results, is that HashMap is somewhat more expensive
-to use than `EnumerableMap` with small map sizes, but the larger the map, the
-better HashMap performs. At 100k keys, HashMap can save users **800M gas**
-compared to `EnumerableMap`.
+| Write a single key             | 45,216        | 89,097        | 22,226        |
+| Write 10k keys to map          | 460,930,127   | 674,363,767   | 225,201,867   |
+| Write 100k keys to map         | 5,255,915,589 | 6,813,751,712 | 2,322,329,812 |
+| Find a key in a 10k map        | 3,129         | 843           | 568           |
+| Find a key in a single key map | 1,110         | 389           | 117           |
+| Iterate over 10k keys          | 367,285,535   | 9,534,692     | 5,104,497     |
+| Remove 10k keys                | 121,899,581   | 23,254,497    | 6,704,497     |
+We can see that compared to `EnumerableMap`, `HashMap` has a distinct trade-off:
+it is much cheaper to write and slightly more expensive to read, but
+considerably more expensive to iterate.
 
 In addition, HashMap is still WIP. There are some optimizations (such as using a
 Balanced Tree instead of LinkedLists) that could reduce gas costs even further.
