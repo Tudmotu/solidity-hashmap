@@ -255,6 +255,7 @@ is both efficient in gas & storage, while providing a simple, familiar API.
 | Find a key in a single key map | 1,110         | 389           | 117           |
 | Iterate over 10k keys          | 367,285,535   | 9,534,692     | 5,104,497     |
 | Remove 10k keys                | 121,899,581   | 23,254,497    | 6,704,497     |
+
 We can see that compared to `EnumerableMap`, `HashMap` has a distinct trade-off:
 it is much cheaper to write and slightly more expensive to read, but
 considerably more expensive to iterate.
