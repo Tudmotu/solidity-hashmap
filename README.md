@@ -1,8 +1,3 @@
-<style>
-img {
-    max-width:min(400px, 100%)!important;
-}
-</style>
 # Solidity HashMap
 [![npm](https://img.shields.io/npm/v/solidity-hashmap)](https://www.npmjs.com/package/solidity-hashmap)
 
