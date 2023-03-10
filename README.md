@@ -23,32 +23,6 @@ to review the code. If you understand what "storage slot collision" means and
 would like to review the code, please contact me directly or by opening an
 issue.
 
-## When should I use a HashMap?
-This `HashMap` implementation is storage-optimized. This means it is much
-cheaper to write key/value pairs than with `EnumerableMap`. But this comes with
-a trade-off — it is orders of magnitude more expensive to iterate.
-
-Therefore, prefer a `HashMap` over `EnumerableMap` if you:
-1. Will mostly be writing keys, not reading
-1. Will be mostly appending values, with few deletions
-1. Don't need to iterate over it inside non-view functions
-
-## Why do we need a true HashMap?
-The `mapping()` data-structure in Solidity is very interesting. It manages to be
-very gas-efficient at O(1) while taking up 1 slot per key/value pair. This is
-highly efficient, but has a serious drawback: 
-Since the `mapping()` storage layout relies on hashing of keys, it is
-impossible to enumerate mappings. You cannot iterate over them or infer what
-keys they hold. Despite its name, it doesn't provide the same API as you'd
-expect of a `Map` object in other languages.
-
-This does not only affect smart-contract authors, but also off-chain data mining
-services. The `mapping()` type creates an untraceable storage trie that makes it
-much harder to index.
-
-HashMap makes development more natural while allowing off-chain tools to easily
-index your smart-contract data.
-
 ## Installation
 Depending on what toolchain you are using, you will require different
 installation methods.
@@ -64,6 +38,78 @@ If you are using Hardhat, install using NPM:
 ```console
 $ npm i -D solidity-hashmap
 ```
+
+## Why use a HashMap?
+This `HashMap` implementation is storage-optimized. This means it is much
+cheaper to write key/value pairs than with `EnumerableMap`. But this comes with
+a trade-off — it is orders of magnitude more expensive to iterate.
+
+Therefore, prefer a `HashMap` over `EnumerableMap` if you:
+1. Will mostly be writing keys, not reading
+1. Will be mostly appending values, with few deletions
+1. Don't need to iterate over it inside non-view functions
+
+### Comparison to alternatives
+Two alternatives exist for HashMap:
+1. Solidity's builtin `mapping()` data structure
+1. OpenZeppelin [`EnumerableMap` implementation](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/structs/EnumerableMap.sol)
+
+HashMap aims to find a balance between gas/storage efficiency, and developer
+experience. While Solidity's `mapping()` is very gas & storage efficient, it is
+not developer friendly at all. And while `EnumerableMap` is more developer
+friendly, it is not storage-efficient.
+
+HashMap finds a balance between storage, gas, and developer experience. HashMap
+is both efficient in gas & storage, while providing a simple, familiar API.
+
+#### Gas costs comparison
+| Test                           | HashMap       | EnumerableMap | Mapping       |
+| ------------------------------ | ------------- | ------------- | ------------- |
+| Write a single key             | 45,216        | 89,097        | 22,226        |
+| Write 10k keys to map          | 460,930,127   | 674,363,767   | 225,201,867   |
+| Write 100k keys to map         | 5,255,915,589 | 6,813,751,712 | 2,322,329,812 |
+| Find a key in a 10k map        | 3,129         | 843           | 568           |
+| Find a key in a single key map | 1,110         | 389           | 117           |
+| Iterate over 10k keys          | 367,285,535   | 9,534,692     | 5,104,497     |
+| Remove 10k keys                | 121,899,581   | 23,254,497    | 6,704,497     |
+
+We can see that compared to `EnumerableMap`, `HashMap` has a distinct trade-off:
+it is much cheaper to write, but considerably more expensive to iterate.
+
+HashMap is still WIP. There are some optimizations (such as using a
+Balanced Tree instead of LinkedLists) that could reduce iteration gas costs
+further.
+
+### Motivation
+The `mapping()` data-structure in Solidity is very interesting. It manages to be
+very gas-efficient at O(1) while taking up 1 slot per key/value pair. This is
+highly efficient, but has a serious drawback: 
+Since the `mapping()` storage layout relies on hashing of keys, it is
+impossible to enumerate mappings. You cannot iterate over them or infer what
+keys they hold. Despite its name, it doesn't provide the same API as you'd
+expect of a `Map` object in other languages.
+
+This does not only affect smart-contract authors, but also off-chain indexing
+services. The `mapping()` type creates an untraceable storage trie that makes it
+much harder to index.
+
+HashMap makes development more natural while allowing off-chain tools to easily
+index your smart-contract data.
+
+### Caveats
+Currently this implementation has some notable caveats. Some of these might get
+"fixed" and some will not, either due to technical or design limitations.
+- Keys and values are `bytes32`. To set/get different values, they must be cast
+appropriately
+- Some of the methods (e.g. `.entries()`, `.values()`) are very gas-intensive
+and are only appropriate in `view` functions called via RPC, where gas is not an
+issue
+- Keys cannot be an empty `bytes32`
+- Only value-types are currently supported: numbers, addresses and strings
+shorter than 32 bytes
+- `memory` HashMaps are currently not supported
+- A HashMap is almost O(1), but not quite. More keys means gas-efficiency might
+deteriorate but it will never reach O(n)
 
 ## Usage
 Usage is straightforward — import the library and use the `HashMap` type for your
@@ -183,25 +229,17 @@ function increment () private returns (uint count) {
 }
 ```
 
-So what does the HashMap storage layout looks like?
-- The "base slot" contains the HashMap size (how many key/value pairs are
-  stored in total)
-- For every "bucket", we use 1 slot to store the size of the bucket (how many
-  pairs exist in this specific bucket)
-- From there on, key/value pairs are stored in slots that are separated by the
-  bucket count of our HashMap 
-
-To visualize this, let's say we have a Hash Map that uses 4 buckets:
+To visualize the storage layout, let's say we have a Hash Map that uses 4 buckets:
 <img alt="A Hash Table with 4 rows and a single key/value pair in each row" src="docs/4buckets.png" style="max-width:min(400px, 100%); display:block;" />
 Here we see that we have 4 rows and in 3 of these rows we have stored values:
 - Row #0 contains:
-    - 0xbadf00d: "Hello World"
-    - 0xbadc0de: "Hello; --World"
+    - `0xbadf00d`: "Hello World"
+    - `0xbadc0de`: "Hello; --World"
 - Row #1 is empty
 - Row #2 contains:
-    - 0xc01df00d: "Cold World"
+    - `0xc01df00d`: "Cold World"
 - Row #3 contains:
-    - 0xf00: "Bar"
+    - `0xf00`: "Bar"
 
 The bucket for each value is not arbitrary. Remember, to determine the bucket of
 a key/value pair, we hash the key and modulo it by 4 (our Hash Table size).
@@ -210,58 +248,12 @@ Next step in visualizing this, is to break the storage slot space into rows,
 each row the length of our Hash Table size (in this case, 4):
 <img alt="EVM storage space, arranged as a table with 4 slots in each row" src="docs/4slotsspace.png" style="max-width:min(400px, 100%); display:block;" />
 
-Now, imaging a *pivoted* Hash Table, where each column in the storage slot space
+Now, imagine a *pivoted* Hash Table, where each column in the storage slot space
 is a "bucket", while the key/value pairs are stored on subsequent rows:
 <img alt="Depiction of our HashMap stored in the EVM storage slot space" src="docs/hashmapinstorage.png" style="max-width:min(400px, 100%); display:block;" />
 
 This is the gist of the storage layout of a HashMap. This does not depict
 everything precisely, but it should help visualize the storage layout.
-
-## Caveats
-Currently this implementation has some notable caveats. Some of these might get
-"fixed" and some will not, either due to technical or design limitations.
-- Keys and values are `bytes32`. To set/get different values, they must be cast
-appropriately
-- Some of the methods (e.g. `.entries()`, `.values()`) are very gas-intensive
-and are only appropriate in `view` functions called via RPC, where gas is not an
-issue
-- Keys cannot be an empty `bytes32`
-- Only value-types are currently supported: numbers, addresses and strings
-shorter than 32 bytes
-- `memory` HashMaps are currently not supported
-- A HashMap is almost O(1), but not quite. More keys means gas-efficiency might
-deteriorate but it will never reach O(n)
-
-## Comparison to alternatives
-Two alternatives exist for HashMap:
-1. Solidity's builtin `mapping()` data structure
-1. OpenZeppelin [`EnumerableMap` implementation](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/structs/EnumerableMap.sol)
-
-HashMap aims to find a balance between gas/storage efficiency, and developer
-experience. While Solidity's `mapping()` is very gas & storage efficient, it is
-not developer friendly at all. And while `EnumerableMap` is more developer
-friendly, it is not storage-efficient.
-
-HashMap finds a balance between storage, gas, and developer experience. HashMap
-is both efficient in gas & storage, while providing a simple, familiar API.
-
-### Gas costs comparison
-| Test                           | HashMap       | EnumerableMap | Mapping       |
-| ------------------------------ | ------------- | ------------- | ------------- |
-| Write a single key             | 45,216        | 89,097        | 22,226        |
-| Write 10k keys to map          | 460,930,127   | 674,363,767   | 225,201,867   |
-| Write 100k keys to map         | 5,255,915,589 | 6,813,751,712 | 2,322,329,812 |
-| Find a key in a 10k map        | 3,129         | 843           | 568           |
-| Find a key in a single key map | 1,110         | 389           | 117           |
-| Iterate over 10k keys          | 367,285,535   | 9,534,692     | 5,104,497     |
-| Remove 10k keys                | 121,899,581   | 23,254,497    | 6,704,497     |
-
-We can see that compared to `EnumerableMap`, `HashMap` has a distinct trade-off:
-it is much cheaper to write and slightly more expensive to read, but
-considerably more expensive to iterate.
-
-In addition, HashMap is still WIP. There are some optimizations (such as using a
-Balanced Tree instead of LinkedLists) that could reduce gas costs even further.
 
 # Contributions
 Contributions are welcome.
