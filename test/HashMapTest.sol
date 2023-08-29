@@ -17,10 +17,14 @@ contract HashMapTest is Test {
     }
 
     function testIterator_iterateAllKeys_Fuzz (bytes32[100] memory keys) public {
+        bytes32 free_mem;
         vm.pauseGasMetering();
 
         vm.assume(keys.length > 0);
         uint uniques;
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         for (uint i = 0; i < keys.length; i++) {
             if (keys[i] == bytes32(0)) continue;
             bool duplicate = false;
@@ -31,10 +35,21 @@ contract HashMapTest is Test {
                 }
             }
             if (duplicate == false) uniques++;
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
+        }
+
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
         }
         for (uint i = 0; i < keys.length; i++) {
-            if (keys[i] == bytes32(0)) continue;
-            hashmap.set(keys[i], keys[i]);
+            if (keys[i] != bytes32(0)) {
+                hashmap.set(keys[i], keys[i]);
+            }
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
 
         uint iteratedCount = 0;
@@ -43,6 +58,9 @@ contract HashMapTest is Test {
 
         HashMapIterator memory iterator = hashmap.iterator();
 
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         while (iterator.hasNext()) {
             KV memory currEntry = iterator.next();
             for (uint i = 0; i < keys.length; i++) {
@@ -51,6 +69,9 @@ contract HashMapTest is Test {
                     iteratedCount++;
                     break;
                 }
+            }
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
             }
         }
 
@@ -140,12 +161,19 @@ contract HashMapTest is Test {
     }
 
     function testMultipleHashMaps_dontCollide () public {
+        bytes32 free_mem;
         vm.pauseGasMetering();
         uint SIZE = 32000;
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         for (uint i = 1; i < SIZE + 1; i++) {
             bytes32 data = bytes32(i);
             hashmap.set(data, data);
             hashmap2.set(data, data);
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
         vm.resumeGasMetering();
 
@@ -175,16 +203,29 @@ contract HashMapTest is Test {
     }
 
     function testSet_noKeyCollisions_Fuzz (bytes32[] memory keys) public {
+        bytes32 free_mem;
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         for (uint i = 0; i < keys.length; i++) {
             vm.assume(keys[i] != bytes32(0));
             bytes32 value = keccak256(abi.encode("value", keys[i]));
             hashmap.set(keys[i], value);
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
 
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         for (uint i = 0; i < keys.length; i++) {
             bytes32 val = hashmap.get(keys[i]);
             bytes32 expected = keccak256(abi.encode("value", keys[i]));
             require(val == expected, "Incorrect value");
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
     }
 
