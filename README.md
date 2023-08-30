@@ -65,13 +65,13 @@ is both efficient in gas & storage, while providing a simple, familiar API.
 #### Gas costs comparison
 | Test                           | HashMap       | EnumerableMap | Mapping       |
 | ------------------------------ | ------------- | ------------- | ------------- |
-| Write a single key             | 45,216        | 89,097        | 22,226        |
-| Write 10k keys to map          | 460,930,127   | 674,363,767   | 225,201,867   |
-| Write 100k keys to map         | 5,255,915,589 | 6,813,751,712 | 2,322,329,812 |
-| Find a key in a 10k map        | 3,129         | 843           | 568           |
-| Find a key in a single key map | 1,110         | 389           | 117           |
-| Iterate over 10k keys          | 367,285,535   | 9,534,692     | 5,104,497     |
-| Remove 10k keys                | 121,899,581   | 23,254,497    | 6,704,497     |
+| Write a single key             | 45,232        | 89,097        | 22,226        |
+| Write 10k keys to map          | 454,004,088   | 673,642,057   | 224,440,157   |
+| Write 100k keys to map         | 4,554,460,568 | 6,736,222,036 | 2,244,400,136 |
+| Find a key in a 10k map        | 1,252         | 524           | 249           |
+| Find a key in a single key map | 1,126         | 389           | 117           |
+| Iterate over 10k keys          | 221,074,548   | 7,250,322     | 2,910,127     |
+| Remove 10k keys                | 64,816,013    | 20,970,127    | 4,390,127     |
 
 We can see that compared to `EnumerableMap`, `HashMap` has a distinct trade-off:
 it is much cheaper to write, but considerably more expensive to iterate.

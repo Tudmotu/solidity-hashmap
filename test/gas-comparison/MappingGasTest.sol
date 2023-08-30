@@ -11,8 +11,15 @@ contract MappingGasTest is Test {
     }
 
     function write10kKeys () private {
+        bytes32 free_mem;
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         for (uint i = 0; i < 10000; i++) {
             map[keccak256(abi.encodePacked(i))] = keccak256("test");
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
     }
 
@@ -31,11 +38,18 @@ contract MappingGasTest is Test {
     }
 
     function test_remove10kKeys () public {
+        bytes32 free_mem;
         write10kKeys();
 
         uint start = gasleft();
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         for (uint i = 0; i < 10000; i++) {
             delete map[keccak256(abi.encodePacked(i))];
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
         measureGas(start);
     }
@@ -49,19 +63,33 @@ contract MappingGasTest is Test {
     }
 
     function test_iterate10kKeys () public {
+        bytes32 free_mem;
         write10kKeys();
 
         uint start = gasleft();
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         for (uint i = 0; i < 10000; i++) {
             map[keccak256(abi.encodePacked(i))];
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
         measureGas(start);
     }
 
     function test_write100kKeys () public {
+        bytes32 free_mem;
         uint start = gasleft();
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         for (uint i = 0; i < 100000; i++) {
             map[keccak256(abi.encodePacked(i))] = keccak256("test");
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
         measureGas(start);
     }

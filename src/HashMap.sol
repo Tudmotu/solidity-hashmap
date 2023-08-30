@@ -60,6 +60,7 @@ library HashMapLib {
     }
 
     function _findKey (HashMap storage map, bytes32 key) private view returns (uint keySlot, bytes32 currKey, uint bucketSlot) {
+        bytes32 free_mem;
         bucketSlot = _bucket(map, key);
 
         assembly {
@@ -67,10 +68,17 @@ library HashMapLib {
             currKey := sload(keySlot)
         }
 
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
+
         while (currKey != "" && currKey != key) {
             assembly {
                 keySlot := add(keySlot, mul(BUCKET_COUNT, 2))
                 currKey := sload(keySlot)
+            }
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
             }
         }
     }
@@ -89,7 +97,7 @@ library HashMapLib {
 
         assembly {
             key := sload(keySlot)
-        } 
+        }
     }
 
     function _getValueInBucketByIndex (HashMap storage map, uint bucket, uint index) internal view returns (bytes32 value, uint valueSlot) {
@@ -98,7 +106,7 @@ library HashMapLib {
 
         assembly {
             value := sload(valueSlot)
-        } 
+        }
     }
 
     function _getKeyValueInBucketByIndex (HashMap storage map, uint bucket, uint index) internal view returns (KV memory kv) {
@@ -115,82 +123,76 @@ library HashMapLib {
         kv = KV(key, value);
     }
 
-    function values (HashMap storage map) internal view returns (bytes32[] memory valueList) {
-        uint mapSize = size(map);
-        uint valueCount = 0;
-        valueList = new bytes32[](mapSize);
+    function values (HashMap storage map) internal view returns (bytes32[] memory list) {
+        HashMapIterator memory iter = iterator(map);
+        bytes memory bytea;
+        uint count;
+        while (iter.hasNext()) {
+            KV memory entry = iter.next();
+            bytea = bytes.concat(bytea, entry.value);
+            count++;
+        }
 
-        for (uint currBucket = 0; currBucket < BUCKET_COUNT; currBucket++) {
-            uint currIndex = 0;
-            (bytes32 currValue,) = _getValueInBucketByIndex(map, currBucket, currIndex);
-            bool lastValue = false;
+        list = new bytes32[](count);
+        for (uint i = 0; i < count; i++) {
+            uint begin = i * 32;
+            uint end = begin + 31;
+            bytes memory element = new bytes(32);
+            for (uint x = 0; x <= end - begin ; x++) {
+                element[x] = bytea[x + begin];
+            }
+            list[i] = bytes32(element);
+        }
+    }
 
-            while (lastValue == false) {
-                if (currValue == EMPTY_BYTES32) {
-                    (bytes32 currKey,) = _getKeyInBucketByIndex(map, currBucket, currIndex);
+    function keys (HashMap storage map) internal view returns (bytes32[] memory list) {
+        HashMapIterator memory iter = iterator(map);
+        bytes memory bytea;
+        uint count;
+        while (iter.hasNext()) {
+            KV memory entry = iter.next();
+            bytea = bytes.concat(bytea, entry.key);
+            count++;
+        }
 
-                    if (currKey == EMPTY_BYTES32) {
-                        lastValue = true;
-                    }
+        list = new bytes32[](count);
+        for (uint i = 0; i < count; i++) {
+            uint begin = i * 32;
+            uint end = begin + 31;
+            bytes memory element = new bytes(32);
+            for (uint x = 0; x <= end - begin ; x++) {
+                element[x] = bytea[x + begin];
+            }
+            list[i] = bytes32(element);
+        }
+    }
 
-                    continue;
+    function entries (HashMap storage map) internal view returns (KV[] memory list) {
+        HashMapIterator memory iter = iterator(map);
+        bytes memory bytea;
+        uint count;
+        while (iter.hasNext()) {
+            KV memory entry = iter.next();
+            bytea = bytes.concat(bytes.concat(bytea, entry.key), entry.value);
+            count++;
+        }
+
+        list = new KV[](count);
+        for (uint i = 0; i < count; i++) {
+            uint begin = i * 64;
+            bytes memory key = new bytes(32);
+            bytes memory value = new bytes(32);
+            for (uint x = 0; x <= 63 ; x++) {
+                if (x < 32) {
+                    key[x] = bytea[x + begin];
                 }
-
-                valueList[valueCount] = currValue;
-                valueCount++;
-                currIndex++;
-                (currValue,) = _getValueInBucketByIndex(map, currBucket, currIndex);
+                else {
+                    value[x - 32] = bytea[x + begin];
+                }
             }
-
-            if (valueCount == mapSize) break;
+            list[i] = KV(bytes32(key), bytes32(value));
         }
-
-        return valueList;
     }
-
-    function keys (HashMap storage map) internal view returns (bytes32[] memory keyList) {
-        uint mapSize = size(map);
-        uint keyCount = 0;
-        keyList = new bytes32[](mapSize);
-
-        for (uint currBucket = 0; currBucket < BUCKET_COUNT; currBucket++) {
-            uint currIndex = 0;
-            (bytes32 currKey,) = _getKeyInBucketByIndex(map, currBucket, currIndex);
-
-            while (currKey != EMPTY_BYTES32) {
-                keyList[keyCount] = currKey;
-                keyCount++;
-                currIndex++;
-                (currKey,) = _getKeyInBucketByIndex(map, currBucket, currIndex);
-            }
-
-            if (keyCount == mapSize) break;
-        }
-
-        return keyList;
-    }
-
-    function entries (HashMap storage map) internal view returns (KV[] memory) {
-        uint mapSize = size(map);
-        uint kvCount = 0;
-        KV[] memory pairs = new KV[](mapSize);
-
-        for (uint currBucket = 0; currBucket < BUCKET_COUNT; currBucket++) {
-            uint bucketIndex = 0;
-            KV memory entry = _getKeyValueInBucketByIndex(map, currBucket, bucketIndex);
-
-            while (entry.key != EMPTY_BYTES32) {
-                pairs[kvCount] = entry;
-                kvCount++;
-                bucketIndex++;
-                entry = _getKeyValueInBucketByIndex(map, currBucket, bucketIndex);
-            }
-
-            if (kvCount == mapSize) break;
-        }
-
-        return pairs;
-    } 
 
     function set (HashMap storage map, bytes32 key, bytes32 value) internal {
         require(key != EMPTY_BYTES32, "Key cannot be empty bytes32");
@@ -210,6 +212,7 @@ library HashMapLib {
     }
 
     function remove (HashMap storage map, bytes32 key) internal {
+        bytes32 free_mem;
         (uint keySlot, bytes32 currKey, uint bucketSlot) = _findKey(map, key);
         require(currKey != EMPTY_BYTES32, "Key does not exist");
 
@@ -217,9 +220,15 @@ library HashMapLib {
         uint bucketIndex = 0;
         (bytes32 lastKey, uint lastKeySlot) = _getKeyInBucketByIndex(map, bucket, bucketIndex);
 
+        assembly ("memory-safe") {
+            free_mem := mload(0x40)
+        }
         while (lastKey != EMPTY_BYTES32) {
             bucketIndex++;
             (lastKey, lastKeySlot) = _getKeyInBucketByIndex(map, bucket, bucketIndex);
+            assembly ("memory-safe") {
+                mstore(0x40, free_mem)
+            }
         }
 
         lastKeySlot -= 2 * BUCKET_COUNT;
@@ -232,7 +241,7 @@ library HashMapLib {
             sstore(lastKeySlot, "")
             sstore(lastValueSlot, "")
         }
-    } 
+    }
 
     function contains (HashMap storage map, bytes32 key) internal view returns (bool exists){
         (, bytes32 currKey,) = _findKey(map, key);
@@ -240,9 +249,10 @@ library HashMapLib {
     }
 
     function iterator (HashMap storage map) internal pure returns (HashMapIterator memory iter) {
-        Cursor memory cursor = Cursor(0, 0);
-        Scan memory latestScan = Scan(false, 0, 0, 0, 0);
-        iter = HashMapIterator(soliditySlot(map), cursor, latestScan);
+        Cursor memory cursor;
+        Scan memory latestScan;
+        KV memory latestEntry;
+        iter = HashMapIterator(soliditySlot(map), cursor, latestScan, latestEntry);
     }
 }
 
@@ -263,6 +273,7 @@ struct HashMapIterator {
     uint mapSlot;
     Cursor cursor;
     Scan latestScan;
+    KV latestEntry;
 }
 
 using HashMapIteratorLib for HashMapIterator global;
@@ -277,17 +288,17 @@ library HashMapIteratorLib {
         }
     }
 
-    function scan (HashMapIterator memory self) internal view returns (
-        Scan memory result
-    ) {
+    function scan (
+        HashMapIterator memory self
+    ) internal view returns (Scan memory) {
+        bytes32 free_mem1;
         HashMap storage map = _getMap(self);
 
         uint currBucket = self.cursor.bucket;
         uint currPosition = self.cursor.position;
 
-        bytes32 free_mem;
         assembly ("memory-safe") {
-            free_mem := mload(0x40)
+            free_mem1 := mload(0x40)
         }
         while (currBucket < BUCKET_COUNT) {
             (bytes32 nextKey, uint keySlot) = map._getKeyInBucketByIndex(
@@ -296,42 +307,42 @@ library HashMapIteratorLib {
             );
 
             if (nextKey != EMPTY_BYTES32) {
-                result = Scan(true, currBucket, currPosition, nextKey, keySlot);
-                self.latestScan = result;
-                return result;
+                self.latestScan = Scan(true, currBucket, currPosition, nextKey, keySlot);
+                return self.latestScan;
             }
 
             currBucket++;
             currPosition = 0;
             assembly ("memory-safe") {
-                mstore(0x40, free_mem)
+                mstore(0x40, free_mem1)
             }
         }
+
+        Scan memory res;
+        return res;
     }
 
     function next (HashMapIterator memory self) internal view returns (KV memory entry) {
-        Scan memory currentScan;
-
-        if (self.latestScan.bucket > self.cursor.bucket ||
-                self.latestScan.position > self.cursor.position ) {
-            currentScan = self.latestScan;
-        }
-        else {
-            currentScan = scan(self);
+        if (self.latestScan.bucket <= self.cursor.bucket &&
+                self.latestScan.position <= self.cursor.position ) {
+            scan(self);
         }
 
-        if (currentScan.found) {
-            self.cursor.bucket = currentScan.bucket;
-            self.cursor.position = currentScan.position + 1;
+        if (self.latestScan.found) {
+            self.cursor.bucket = self.latestScan.bucket;
+            self.cursor.position = self.latestScan.position + 1;
 
             bytes32 nextValue;
-            uint keySlot = currentScan.keySlot;
+            self.latestEntry.key = self.latestScan.key;
+            uint keySlot = self.latestScan.keySlot;
 
             assembly {
                 nextValue := sload(add(keySlot, BUCKET_COUNT))
             }
 
-            return KV(currentScan.key, nextValue);
+            self.latestEntry.value = nextValue;
+
+            return self.latestEntry;
         }
     }
 
