@@ -1,12 +1,12 @@
 {
   "name": "solidity-hashmap",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A true HashMap implementation for Solidity",
-  "main": "src/HashMap.sol",
+  "main": "./HashMap.sol",
   "scripts": {
     "test": "forge test",
-    "prepare": "mv src/HashMap.sol .",
-    "postpack": "mv ./HashMap.sol ./src/HashMap.sol"
+    "prepare": "cp src/*.sol .",
+    "postpack": "rm ./*.sol"
   },
   "repository": {
     "type": "git",
@@ -26,7 +26,8 @@
   },
   "homepage": "https://github.com/Tudmotu/solidity-hashmap#readme",
   "files": [
-    "HashMap.sol"
+    "HashMap.sol",
+    "HashMapAccessors.sol"
   ],
   "devDependencies": {
     "markdown-table": "^3.0.3"
