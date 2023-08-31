@@ -1,4 +1,4 @@
-# Solidity HashMap
+# #️⃣ Solidity HashMap
 [![npm](https://img.shields.io/npm/v/solidity-hashmap)](https://www.npmjs.com/package/solidity-hashmap)
 
 Solidity famously lacks complex data-structures such as HashMaps, LinkedLists,
@@ -7,23 +7,31 @@ etc. `solidity-hashmap` is a true HashMap implementation for Solidity.
 This library is an attempt at implementing a true, efficient HashMap
 data-structure in Solidity which includes all the familiar API methods you'd
 expect a HashMap to support:
-- `.get(bytes32 key): bytes32`
-- `.set(bytes32 key, bytes32 value): void`
+- `.get(key): Element`
+- `.set(key, value): void`
 - `.size(): uint`
-- `.keys(): bytes32[]`
-- `.values(): bytes32[]`
-- `.entries(): KV[]`
-- `.contains(bytes32 key): bool`
+- `.keys(): Element[]`
+- `.values(): Element[]`
+- `.entries(): Entry[]`
+- `.contains(key): bool`
 - `.iterator(): HashMapIterator`
 
-## Disclaimer
-This is WIP. It probably contains bugs that would cause "storage slot
-collisions". It is still not fully gas-optimized. I am looking for people
-to review the code. If you understand what "storage slot collision" means and
-would like to review the code, please contact me directly or by opening an
-issue.
+The API includes multiple overloads for all value types and strings (shorter
+than 32 bytes). See the [API section](#-api) for more information.
 
-## Installation
+> ⚠️ **DISCLAIMER**  
+> This library has not been used in production. It has not been audited and might
+> still contain serious bugs. Use at your own risk.
+
+## 📖 Table of contents
+
+* [📦 Installation](#-installation)
+* [🤔 Why `HashMap`](#-why-hashmap)
+* [🔧 API](#-api)
+* [✨ How does `HashMap` work?](#-how-does-hashmap-work)
+* [⌨️ Contributions](#-contributions)
+
+## 📦 Installation
 Depending on what toolchain you are using, you will require different
 installation methods.
 
@@ -39,28 +47,30 @@ If you are using Hardhat, install using NPM:
 $ npm i -D solidity-hashmap
 ```
 
-## Why use a HashMap?
-This `HashMap` implementation is storage-optimized. This means it is much
-cheaper to write key/value pairs than with `EnumerableMap`. But this comes with
-a trade-off — it is orders of magnitude more expensive to iterate.
+## 🤔 Why `HashMap`
 
-Therefore, prefer a `HashMap` over `EnumerableMap` if you:
-1. Will mostly be writing keys, not reading
-1. Will be mostly appending values, with few deletions
-1. Don't need to iterate over it inside non-view functions
+### Motivation
+The `mapping()` data structure in Solidity provides very gas-efficient writes at
+O(1), taking up 1 slot per key/value pair. This is highly efficient, but has a
+serious drawback: 
+It is impossible to enumerate mappings and despite its name, it doesn't provide
+the same API as you'd expect of a `Map` object in other languages.
+
+`HashMap` provides an enumerable yet write-efficient data structure.
 
 ### Comparison to alternatives
 Two alternatives exist for HashMap:
 1. Solidity's builtin `mapping()` data structure
 1. OpenZeppelin [`EnumerableMap` implementation](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/structs/EnumerableMap.sol)
 
-HashMap aims to find a balance between gas/storage efficiency, and developer
-experience. While Solidity's `mapping()` is very gas & storage efficient, it is
-not developer friendly at all. And while `EnumerableMap` is more developer
-friendly, it is not storage-efficient.
+HashMap finds a balance between write-efficiency, and developer experience.
+While `mapping()` is very efficient, it is not developer friendly and while
+`EnumerableMap` is more developer friendly, it is not efficient.
 
-HashMap finds a balance between storage, gas, and developer experience. HashMap
-is both efficient in gas & storage, while providing a simple, familiar API.
+Prefer a `HashMap` over `EnumerableMap` if you:
+1. Write many keys
+1. Rarely delete keys
+1. Don't need to iterate over it onchain
 
 #### Gas costs comparison
 | Test                           | HashMap       | EnumerableMap | Mapping       |
@@ -76,87 +86,177 @@ is both efficient in gas & storage, while providing a simple, familiar API.
 We can see that compared to `EnumerableMap`, `HashMap` has a distinct trade-off:
 it is much cheaper to write, but considerably more expensive to iterate.
 
-HashMap is still WIP. There are some optimizations (such as using a
-Balanced Tree instead of LinkedLists) that could reduce iteration gas costs
-further.
-
-### Motivation
-The `mapping()` data-structure in Solidity is very interesting. It manages to be
-very gas-efficient at O(1) while taking up 1 slot per key/value pair. This is
-highly efficient, but has a serious drawback: 
-Since the `mapping()` storage layout relies on hashing of keys, it is
-impossible to enumerate mappings. You cannot iterate over them or infer what
-keys they hold. Despite its name, it doesn't provide the same API as you'd
-expect of a `Map` object in other languages.
-
-This does not only affect smart-contract authors, but also off-chain indexing
-services. The `mapping()` type creates an untraceable storage trie that makes it
-much harder to index.
-
-HashMap makes development more natural while allowing off-chain tools to easily
-index your smart-contract data.
-
 ### Caveats
-Currently this implementation has some notable caveats. Some of these might get
-"fixed" and some will not, either due to technical or design limitations.
-- Keys and values are `bytes32`. To set/get different values, they must be cast
-appropriately
-- Some of the methods (e.g. `.entries()`, `.values()`) are very gas-intensive
-and are only appropriate in `view` functions called via RPC, where gas is not an
-issue
-- Keys cannot be an empty `bytes32`
-- Only value-types are currently supported: numbers, addresses and strings
-shorter than 32 bytes
-- `memory` HashMaps are currently not supported
+- Keys cannot be empty when converted to `bytes32`:
+    - `string` keys cannot be empty
+    - `int`/`uint` keys cannot be `0`
+- Only "value" types are supported: `bytes32`, `uint`, `int`, `address`,
+`bool`, and `string` (shorter than 32 bytes)
+- Literal variables (numbers, strings) must be explicitly converted to their
+"value" types in order for the compiler to identify the correct overloads
+- The `.entries()`, `.values()` and `.keys()` (and their variants) are very
+gas-intensive and should only be used in `view` functions called via RPC where
+gas is not an issue
+- `memory` HashMaps are not supported
 - A HashMap is almost O(1), but not quite. More keys means gas-efficiency might
 deteriorate but it will never reach O(n)
 
-## Usage
-Usage is straightforward — import the library and use the `HashMap` type for your
-variables.
+## 🔧 API
+Import the library and use the `HashMap` type in your contract:
 ```solidity
 import 'solidity-hashmap/HashMap.sol';
 
 contract Example {
-    HashMap hashmap;
+    HashMap tokens;
+    HashMap balances;
 
-    constructor () {
-        hashmap.set("key", "value");
-        hashmap.get("key");
+    function mint (address to, uint tokenId) external {
+        require(tokens.get(tokenId).asAddress() == address(0));
+        tokens.set(tokenId, to);
+        balances.set(to, balances.get(to).asUint() + 1);
+    }
+
+    function ownerOf (uint tokenId) external returns (address owner) {
+        owner = tokens.get(tokenId).asAddress();
+    }
+
+    function balanceOf (address owner) external returns (uint balance) {
+        balance = balances.get(owner).asUint();
     }
 }
 ```
 
-### Iterator
-You can lazily iterate over a HashMap instead of pulling all entries at once.
-For that, you use a `HashMapIterator` instance, which can be create by invoking
-`.iterator()` on a HashMap.
+### `.set(key, value): void`
+To set key/value pairs, use the `.set(key, value)` function. Overloads are
+included for all combinations of the following types: `bytes32`, `uint`, `int`,
+`bool`, `address` and `string memory` (shorter than 32 bytes).
+
+```solidity
+contract Example {
+    HashMap hashmap;
+
+    constructor () {
+        hashmap.set(address(0x1ee7c0de), string("test"));
+        hashmap.set(string("key"), true);
+        hashmap.set(uint(256), -30);
+        hashmap.set(keccak256(hex"00"), address(0));
+        hashmap.set(-1, uint(420))
+    }
+}
+```
+
+### `.get(key): Element`
+The `.get()` method returns a type called `Element`. This type represents the
+underlying value and has convenience methods for converting it into native
+types. The `.get()` method includes overloads for the same types as `.set()`.
+
+```solidity
+contract Example {
+    HashMap hashmap;
+
+    constructor () {
+        hashmap.get(address(0x1ee7c0de)).asString();
+        hashmap.get(string("key")).asBool();
+        hashmap.get(uint(256)).asInt();
+        hashmap.get(keccak256(hex"00")).asAddress();
+        hashmap.get(-1).asUint();
+    }
+}
+```
+
+### `Element` type
+The `Element` type represents either a key or value in the `HashMap`. It is
+technically a wrapper around `bytes32` but contains some special heuristics and
+therefore should not be unwrapped directly.
+
+The `Element` type exposes typed convenience methods:
+
+- `.asBytes32(): bytes32`
+- `.asBool(): bool`
+- `.asAddress(): address`
+- `.asUint(): uint`
+- `.asInt(): int`
+- `.asBytes(): bytes`
+- `.asString(): string`
+
+### `HashMapIterator`
+To enumerate a `HashMap`, you use an iterator. Iterators are created by calling
+`.iterator()` on a `HashMap`.
 
 The `HashMapIterator` has the following API:
-- `.hasNext()`
-- `.next()`
+- `.hasNext(): bool`
+- `.next(): Entry`
 
-You can iterate over the HashMap as long as the `iterator.hasNext()` returns
+You can iterate over the `HashMap` as long as `iterator.hasNext()` returns
 `true`:
+
 ```solidity
 function findValueLargerThan10 (HashMap storage map) private returns (uint) {
     HashMapIterator memory iterator = map.iterator();
+
     while (iterator.hasNext()) {
-        KV entry = iterator.next();
-        uint val = uint(entry.value);
+        Entry memory entry = iterator.next();
+        uint val = entry.value.asUint();
         if (val > 10) return val;
     }
 }
 ```
+
 With an iterator, you don't need to enumerate the entire HashMap — which is very
 gas-consuming — in order to find a key or a value. It's still very gas intensive
-and meant for view functions only.
+and should still be used in `view` functions only.
 
-### KV - Key/Value struct
-The `KV` struct is a wrapper around two `bytes32` variables. It has two fields:
-`.key` and `.value`.
+### `Entry memory` type
+The `Entry` type represents a key/value pair in the form of 2 `Element`
+attributes: `.key` and `.value`. These attributes can be converted into
+different native types using the `Element` convenience methods:
 
-## How does `HashMap` work?
+```solidity
+contract Example {
+    HashMap hashmap;
+
+    constructor () {
+        Entry memory entry = hashmap.get(string("key"));
+        string memory key = entry.key.asString();
+        uint value = entry.value.asUint();
+
+        // You can also chain these methods
+        uint aDifferentValue = hashmap.get(string("other")).value.asUint();
+    }
+}
+```
+
+### `.keys()`, `.values()` & and variants
+The methods `.keys()` and `.values()` return an `Element[]` array of the
+`HashMap` keys and values respectively.
+
+In addition, `HashMap` has convenience methods that automatically convert the
+`Element` variables into specific types:
+
+- `.keysAsBytes32(): bytes32[]`
+- `.keysAsAddress(): address[]`
+- `.keysAsBool(): bool[]`
+- `.keysAsUint(): uint[]`
+- `.keysAsInt(): int[]`
+- `.keysAsString(): string[]`
+- `.valuesAsBytes32(): bytes32[]`
+- `.valuesAsAddress(): address[]`
+- `.valuesAsBool(): bool[]`
+- `.valuesAsUint(): uint[]`
+- `.valuesAsInt(): int[]`
+- `.valuesAsString(): string[]`
+
+### `.entries(): Entry[]`
+Returns the list of all key/value pairs in the form of an `Entry[]` array.
+
+### `.contains(key): bool`
+Returns `true` if the key exists. Supports all the usual overloaded versions.
+
+### `.remove(key): void`
+Removes the key/value pair from the `HashMap`. Supports all the usual overloaded
+versions.
+
+## ✨ How does `HashMap` work?
 This implementation is not a perfect HashMap implementation. This implementation
 is EVM-specific and some implementation details either require workarounds, or
 can't be implemented without incurring high gas fees. Below is a description of
@@ -168,11 +268,11 @@ two-dimensional data structure, where each row has a "number" column and a
 LinkedList or array of values. The rows are numbered sequentially and the table
 has a specified "size" — meaning the amount of rows is limited.
 
-<img alt="Hash Table with 4 rows and different values" src="docs/hashtable.png" style="max-width:min(400px, 100%); display:block;" />
+<img alt="Hash Table with 4 rows and different values" src="docs/hashtable.png" width="500" style="display:block" />
 
 The number of rows in the Hash Table is arbitrary. In non-blockchain VMs, it can
-even change in run-time. Currently, this implementation does not support
-changing the table size in run-time due to the associated gas costs.
+even change in run-time. This implementation does not support changing the table
+size in run-time due to the associated gas costs.
 
 In this implementation, we refer to the number of each row as a *"bucket"*.
 
@@ -193,7 +293,8 @@ keccak256(hex"badf00d") % 256
 ```
 
 We then append our key/value pair to that bucket:
-<img alt="Hash Table with rows numbered 1, 2, ..., 156" src="docs/badf00d.png" style="max-width:min(400px, 100%); display:block;" />
+
+<img alt="Hash Table with rows numbered 1, 2, ..., 156" src="docs/badf00d.png" width="500" style="display:block" />
 
 ### Finding values
 To find a value associated with a key, we need to traverse the Hash Table:
@@ -216,7 +317,8 @@ concept, check out the [relevant Solidity docs](https://docs.soliditylang.org/en
 Every contract deployed on Ethereum gets its own "storage space". This
 storage space is composed of "slots" — individual blocks of 32 bytes. Slots are
 numbered sequentially and have a range of [0..2<sup>256</sup>-1]:
-<img alt="Square arranged horizontally, numbered 1,2,3,...2^256-1" src="docs/slotspace.png" style="max-width:min(400px, 100%); display:block;" />
+
+<img alt="Square arranged horizontally, numbered 1,2,3,...2^256-1" src="docs/slotspace.png" width="500" style="display:block" />
 
 You can read and write from any slot using the `sstore` and `sload` EVM op
 codes:
@@ -230,7 +332,9 @@ function increment () private returns (uint count) {
 ```
 
 To visualize the storage layout, let's say we have a Hash Map that uses 4 buckets:
-<img alt="A Hash Table with 4 rows and a single key/value pair in each row" src="docs/4buckets.png" style="max-width:min(400px, 100%); display:block;" />
+
+<img alt="A Hash Table with 4 rows and a single key/value pair in each row" src="docs/4buckets.png" width="500" style="display:block" />
+
 Here we see that we have 4 rows and in 3 of these rows we have stored values:
 - Row #0 contains:
     - `0xbadf00d`: "Hello World"
@@ -246,16 +350,18 @@ a key/value pair, we hash the key and modulo it by 4 (our Hash Table size).
 
 Next step in visualizing this, is to break the storage slot space into rows,
 each row the length of our Hash Table size (in this case, 4):
-<img alt="EVM storage space, arranged as a table with 4 slots in each row" src="docs/4slotsspace.png" style="max-width:min(400px, 100%); display:block;" />
+
+<img alt="EVM storage space, arranged as a table with 4 slots in each row" src="docs/4slotsspace.png" width="500" style="display:block" />
 
 Now, imagine a *pivoted* Hash Table, where each column in the storage slot space
 is a "bucket", while the key/value pairs are stored on subsequent rows:
-<img alt="Depiction of our HashMap stored in the EVM storage slot space" src="docs/hashmapinstorage.png" style="max-width:min(400px, 100%); display:block;" />
+
+<img alt="Depiction of our HashMap stored in the EVM storage slot space" src="docs/hashmapinstorage.png" width="500" style="display:block" />
 
 This is the gist of the storage layout of a HashMap. This does not depict
 everything precisely, but it should help visualize the storage layout.
 
-# Contributions
+## ⌨️ Contributions
 Contributions are welcome.
 
 Please avoid opening unsolicited PRs without first discussing them in an issue.
