@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Unlicese
 pragma solidity ^0.8.18;
 
 import 'forge-std/Test.sol';
@@ -6,7 +7,7 @@ import '../../src/HashMap.sol';
 contract HashMapGasTest is Test {
     HashMap map;
 
-    function measureGas (uint startGas) private {
+    function measureGas (uint startGas) private view {
         console2.log("Gas used:", startGas - gasleft());
     }
 
@@ -24,16 +25,16 @@ contract HashMapGasTest is Test {
     }
 
     function test_findKeySingleKeyMap () public {
-        map.set("test", "test");
+        map.set(string("test"), string("test"));
 
         uint start = gasleft();
-        map.contains("test");
+        map.contains(string("test"));
         measureGas(start);
     }
 
     function test_writeSingleKey () public {
         uint start = gasleft();
-        map.set("test", "test");
+        map.set(string("test"), string("test"));
         measureGas(start);
     }
 

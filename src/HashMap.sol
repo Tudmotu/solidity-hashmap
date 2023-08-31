@@ -1,9 +1,11 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Unlicese
 // See Solidity forum discussion: https://forum.soliditylang.org/t/adding-hashmap-style-storage-layout-to-solidity/1448
 // This HashMap implementation is somewhat similar to how Java's HashMap works.
 // For example: https://anmolsehgal.medium.com/java-hashmap-internal-implementation-21597e1efec3
 
 pragma solidity >=0.8.13 <0.9.0;
+
+import './HashMapAccessors.sol';
 
 uint constant BUCKET_COUNT = 65536;
 
@@ -12,10 +14,14 @@ struct HashMap {
 }
 
 using HashMapLib for HashMap global;
+using HashMapAccessors for HashMap global;
 
-struct KV {
-    bytes32 key;
-    bytes32 value;
+type Element is bytes32;
+using ElementLib for Element global;
+
+struct Entry {
+    Element key;
+    Element value;
 }
 
 library HashMapLib {
@@ -109,10 +115,13 @@ library HashMapLib {
         }
     }
 
-    function _getKeyValueInBucketByIndex (HashMap storage map, uint bucket, uint index) internal view returns (KV memory kv) {
+    function _getKeyValueInBucketByIndex (HashMap storage map, uint bucket, uint index) internal view returns (Entry memory kv) {
         (bytes32 key, uint keySlot) = _getKeyInBucketByIndex(map, bucket, index);
 
-        if (key == "") return KV("", "");
+        if (key == "") {
+            Entry memory entry;
+            return entry;
+        }
 
         uint valueSlot = keySlot + BUCKET_COUNT;
         bytes32 value;
@@ -120,20 +129,20 @@ library HashMapLib {
             value := sload(valueSlot)
         }
 
-        kv = KV(key, value);
+        kv = Entry(Element.wrap(key), Element.wrap(value));
     }
 
-    function values (HashMap storage map) internal view returns (bytes32[] memory list) {
+    function values (HashMap storage map) internal view returns (Element[] memory list) {
         HashMapIterator memory iter = iterator(map);
         bytes memory bytea;
         uint count;
         while (iter.hasNext()) {
-            KV memory entry = iter.next();
-            bytea = bytes.concat(bytea, entry.value);
+            Entry memory entry = iter.next();
+            bytea = bytes.concat(bytea, entry.value.asBytes());
             count++;
         }
 
-        list = new bytes32[](count);
+        list = new Element[](count);
         for (uint i = 0; i < count; i++) {
             uint begin = i * 32;
             uint end = begin + 31;
@@ -141,21 +150,21 @@ library HashMapLib {
             for (uint x = 0; x <= end - begin ; x++) {
                 element[x] = bytea[x + begin];
             }
-            list[i] = bytes32(element);
+            list[i] = Element.wrap(bytes32(element));
         }
     }
 
-    function keys (HashMap storage map) internal view returns (bytes32[] memory list) {
+    function keys (HashMap storage map) internal view returns (Element[] memory list) {
         HashMapIterator memory iter = iterator(map);
         bytes memory bytea;
         uint count;
         while (iter.hasNext()) {
-            KV memory entry = iter.next();
-            bytea = bytes.concat(bytea, entry.key);
+            Entry memory entry = iter.next();
+            bytea = bytes.concat(bytea, entry.key.asBytes());
             count++;
         }
 
-        list = new bytes32[](count);
+        list = new Element[](count);
         for (uint i = 0; i < count; i++) {
             uint begin = i * 32;
             uint end = begin + 31;
@@ -163,21 +172,24 @@ library HashMapLib {
             for (uint x = 0; x <= end - begin ; x++) {
                 element[x] = bytea[x + begin];
             }
-            list[i] = bytes32(element);
+            list[i] = Element.wrap(bytes32(element));
         }
     }
 
-    function entries (HashMap storage map) internal view returns (KV[] memory list) {
+    function entries (HashMap storage map) internal view returns (Entry[] memory list) {
         HashMapIterator memory iter = iterator(map);
         bytes memory bytea;
         uint count;
         while (iter.hasNext()) {
-            KV memory entry = iter.next();
-            bytea = bytes.concat(bytes.concat(bytea, entry.key), entry.value);
+            Entry memory entry = iter.next();
+            bytea = bytes.concat(
+                bytes.concat(bytea, entry.key.asBytes()),
+                entry.value.asBytes()
+            );
             count++;
         }
 
-        list = new KV[](count);
+        list = new Entry[](count);
         for (uint i = 0; i < count; i++) {
             uint begin = i * 64;
             bytes memory key = new bytes(32);
@@ -190,7 +202,10 @@ library HashMapLib {
                     value[x - 32] = bytea[x + begin];
                 }
             }
-            list[i] = KV(bytes32(key), bytes32(value));
+            list[i] = Entry(
+                Element.wrap(bytes32(key)),
+                Element.wrap(bytes32(value))
+            );
         }
     }
 
@@ -204,7 +219,7 @@ library HashMapLib {
         }
     }
 
-    function get (HashMap storage map, bytes32 key) internal view returns (bytes32 value) {
+    function get (HashMap storage map, bytes32 key) internal view returns (Element value) {
         (uint keySlot,,) = _findKey(map, key);
         assembly {
             value := sload(add(keySlot, BUCKET_COUNT))
@@ -251,7 +266,7 @@ library HashMapLib {
     function iterator (HashMap storage map) internal pure returns (HashMapIterator memory iter) {
         Cursor memory cursor;
         Scan memory latestScan;
-        KV memory latestEntry;
+        Entry memory latestEntry;
         iter = HashMapIterator(soliditySlot(map), cursor, latestScan, latestEntry);
     }
 }
@@ -265,7 +280,7 @@ struct Scan {
     bool found;
     uint bucket;
     uint position;
-    bytes32 key;
+    Element key;
     uint keySlot;
 }
 
@@ -273,7 +288,7 @@ struct HashMapIterator {
     uint mapSlot;
     Cursor cursor;
     Scan latestScan;
-    KV latestEntry;
+    Entry latestEntry;
 }
 
 using HashMapIteratorLib for HashMapIterator global;
@@ -307,7 +322,9 @@ library HashMapIteratorLib {
             );
 
             if (nextKey != EMPTY_BYTES32) {
-                self.latestScan = Scan(true, currBucket, currPosition, nextKey, keySlot);
+                self.latestScan = Scan(
+                    true, currBucket, currPosition, Element.wrap(nextKey), keySlot
+                );
                 return self.latestScan;
             }
 
@@ -322,7 +339,7 @@ library HashMapIteratorLib {
         return res;
     }
 
-    function next (HashMapIterator memory self) internal view returns (KV memory entry) {
+    function next (HashMapIterator memory self) internal view returns (Entry memory entry) {
         if (self.latestScan.bucket <= self.cursor.bucket &&
                 self.latestScan.position <= self.cursor.position ) {
             scan(self);
@@ -340,7 +357,7 @@ library HashMapIteratorLib {
                 nextValue := sload(add(keySlot, BUCKET_COUNT))
             }
 
-            self.latestEntry.value = nextValue;
+            self.latestEntry.value = Element.wrap(nextValue);
 
             return self.latestEntry;
         }
