@@ -1,6 +1,6 @@
 {
   "name": "solidity-hashmap",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A true HashMap implementation for Solidity",
   "main": "./HashMap.sol",
   "scripts": {
