@@ -215,13 +215,18 @@ different native types using the `Element` convenience methods:
 contract Example {
     HashMap hashmap;
 
-    constructor () {
-        Entry memory entry = hashmap.get(string("key"));
-        string memory key = entry.key.asString();
-        uint value = entry.value.asUint();
+    function example () public {
+        HashMapIterator memory iterator = hashmap.iterator();
 
-        // You can also chain these methods
-        uint aDifferentValue = hashmap.get(string("other")).value.asUint();
+        while (iterator.hasNext()) {
+            Entry memory entry = iterator.next();
+            string memory key = entry.key.asString();
+            uint value = entry.value.asUint();
+
+            // You can also chain these methods
+            // Note: every time you call `.next()` you receive the next entry
+            uint aDifferentValue = iterator.next().value.asUint();
+        }
     }
 }
 ```
